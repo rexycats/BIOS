@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BIOS-oefenomgeving</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/*
+VOICE: praktisch lesmateriaal, rustig en zakelijk; de simulator is de ster.
+IDEA: een echte klas-pc: scherm, toetsen en de open kast, met een opdrachtenblad ernaast.
+PICTURE: het donkere BIOS-scherm zelf, groot bovenaan, volledig bedienbaar.
+COLOUR and TYPE: wit/grafiet blad; scherm grafiet met cyaan selectie, rood voor gevaar. Barlow voor firmware, IBM Plex voor uitleg.
+LAYOUT: tabs bovenaan, scherm + kast links, opdrachten of storingsticket rechts; onder 1000px gestapeld.
+*/
+:root{color-scheme:light dark;--bg:light-dark(#f4f5f7,#0e1013);--card:light-dark(#fff,#171a1f);--ink:light-dark(#16181c,#e8eaee);--mute:light-dark(#5b6270,#9aa2b1);--line:light-dark(#dfe2e7,#2a2f37);--acc:light-dark(#0b7fa6,#4cc7ec);--ok:light-dark(#16824a,#3fcf86);--bad:#e0483e;--warn:light-dark(#a86a00,#e6b04a)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "IBM Plex Sans",system-ui,sans-serif;overflow-x:clip}
+header{padding:20px max(4vw,16px) 0;max-width:1440px;margin:0 auto}
+h1{font:700 clamp(28px,3.4vw,40px)/1.05 "Barlow",system-ui,sans-serif;margin:0 0 4px;text-wrap:balance}
+.sub{color:var(--mute);margin:0 0 14px;max-width:70ch}
+nav{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+nav a{padding:10px 16px;text-decoration:none;color:var(--mute);font-weight:600;border-bottom:3px solid transparent;min-height:44px}
+nav a.on{color:var(--ink);border-color:var(--acc)}
+main{max-width:1440px;margin:0 auto;padding:18px max(4vw,16px) 48px}
+.view{display:none}.view.on{display:block}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:18px;align-items:start}
+@media(max-width:1000px){.grid{grid-template-columns:minmax(0,1fr)}}
+button,select{font:inherit;cursor:pointer}
+:focus-visible{outline:2px solid #4cc7ec;outline-offset:2px}
+
+/* ---------- monitor ---------- */
+.monitor{background:#0a0b0d;border-radius:14px;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+#scr{position:relative;aspect-ratio:16/10;min-height:470px;background:#121418;color:#d7dce4;font:14px/1.35 "Barlow",system-ui,sans-serif;border-radius:6px;overflow:hidden;user-select:none;outline:none}
+#scr:focus-visible{box-shadow:0 0 0 2px #4cc7ec}
+@media(max-width:700px){#scr{aspect-ratio:auto;min-height:640px}}
+.keys{display:flex;gap:6px;flex-wrap:wrap;padding:10px 2px 0}
+.kb{background:#23272e;color:#e8ebf0;border:1px solid #363b44;border-bottom-width:3px;border-radius:6px;padding:6px 10px;min-height:40px;min-width:44px;font:600 13px "IBM Plex Mono",monospace}
+.kb:hover{background:#2c313a}
+.kb.pw{font-family:"IBM Plex Sans",sans-serif;font-size:14px}
+.kb.pw.on{border-color:#2f8f5b;color:#9ff0c2}
+.case{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.case h3{margin:0 0 2px;font:700 17px "Barlow",system-ui,sans-serif}
+.case p{margin:0 0 8px;color:var(--mute);font-size:13.5px}
+.hw{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px}
+.hwb{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:56px}
+.hwb small{color:var(--mute);font-size:12px}.hwb b{font-size:14px}
+.hwb.bad b{color:var(--bad)}.hwb.good b{color:var(--ok)}
+.hwb select{width:100%;font-size:14px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:4px}
+.hwnote{min-height:20px;font-size:13px;color:var(--bad);margin-top:6px}
+.note{font-size:12.5px;color:var(--mute);margin-top:10px}
+
+/* POST & boot */
+.post{position:absolute;inset:0;background:#000;color:#cfd3d8;padding:26px 32px;font:15px/1.6 "IBM Plex Mono",monospace;overflow:auto}
+.post .logo{position:absolute;inset:0;display:grid;place-items:center;font:700 54px/1 "Barlow Condensed",system-ui,sans-serif;color:#fff;letter-spacing:.02em}
+.post .bar{height:6px;background:#222;margin:16px 0;max-width:420px}.post .bar i{display:block;height:100%;background:#4cc7ec;width:0}
+.post .k{position:absolute;left:32px;right:32px;bottom:22px;color:#fff;font-size:14px}
+.post .k b{background:#fff;color:#000;padding:0 6px;border-radius:3px}
+.post .err{color:#ff7b72}.post .ok{color:#7ee2a8}.post .tip{color:#9ad8ee;font-family:"IBM Plex Sans",sans-serif;font-size:14px;max-width:62ch}
+.post input{font:16px "IBM Plex Mono";background:#000;color:#fff;border:1px solid #666;padding:4px 8px;margin-top:6px}
+.blink{animation:bl 1s steps(1) infinite}@keyframes bl{50%{opacity:0}}
+.win{position:absolute;inset:0;background:linear-gradient(160deg,#0b3a6b,#0a1f3d);color:#fff;font-family:"IBM Plex Sans",sans-serif;padding:22px 26px;overflow:auto}
+.win h2{font:600 24px/1.2 "IBM Plex Sans",sans-serif;margin:0 0 4px}.win>p{margin:4px 0 12px;color:#c9d6ea;max-width:60ch}
+.sys{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:10px 14px;max-width:620px}
+.sys h3{margin:0 0 6px;font:600 14px "IBM Plex Sans",sans-serif;color:#cfe3ff}
+.sys dl{display:grid;grid-template-columns:minmax(0,46%) minmax(0,1fr);gap:3px 12px;margin:0;font-size:13.5px}
+.sys dt{color:#a9bcd8}.sys dd{margin:0}.sys .no{color:#ffb4ab}.sys .yes{color:#a6f0c6}
+.bsod{position:absolute;inset:0;background:#0b6cc4;color:#fff;font-family:"IBM Plex Sans",sans-serif;padding:40px 48px;overflow:auto}
+.bsod .sad{font-size:90px;line-height:1;margin-bottom:16px}
+.bsod p{max-width:56ch;font-size:17px}.bsod .tip{background:rgba(0,0,0,.25);padding:8px 12px;border-radius:6px;font-size:14px}
+.setup{position:absolute;inset:0;background:linear-gradient(135deg,#3a2f8f,#1b4fa3);display:grid;place-items:center;font-family:"IBM Plex Sans",sans-serif;padding:20px}
+.setup .w{background:#f3f3f3;color:#222;border-radius:6px;padding:22px 26px;max-width:460px;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+.setup h2{margin:0 0 8px;font:600 20px "IBM Plex Sans",sans-serif}.setup p{font-size:14px;color:#444}
+.off{position:absolute;inset:0;background:#050505;display:grid;place-items:center;color:#777;text-align:center;font-family:"IBM Plex Sans",sans-serif;padding:20px}
+
+/* UEFI chrome */
+.top{display:flex;align-items:center;gap:6px 18px;padding:8px 16px;background:#0d0f12;border-bottom:1px solid #2a2f37;flex-wrap:wrap}
+.top .brand{font:700 18px "Barlow Condensed",system-ui,sans-serif;color:#fff;letter-spacing:.03em}
+.top .brand span{color:#4cc7ec;font-weight:600}
+.top .clock{font:600 15px "Barlow",system-ui,sans-serif;color:#e7ebf1}
+.top .tk{margin-left:auto;display:flex;gap:4px 12px;flex-wrap:wrap;font-size:13px}
+.top .tk button,.foot button{background:none;border:0;color:#aab2bf;padding:3px 2px;font-size:13px}
+.top .tk button:hover,.foot button:hover{color:#fff}
+.tabs{display:flex;background:#16191e;border-bottom:1px solid #2a2f37;overflow-x:auto}
+.tabs button{background:none;border:0;color:#9aa3b1;padding:9px 13px;font:600 15px "Barlow",system-ui,sans-serif;white-space:nowrap;border-bottom:2px solid transparent}
+.tabs button.on{color:#fff;border-color:#4cc7ec;background:#1d2128}
+.body{position:absolute;top:var(--hdr,82px);bottom:30px;left:0;right:0;display:grid;grid-template-columns:minmax(0,1fr) 240px}
+@media(max-width:700px){.body{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}.side{max-height:170px}}
+.list{overflow-y:auto;padding:6px 0}
+.crumb{padding:6px 16px;color:#4cc7ec;font-weight:600;font-size:13px}
+.crumb button{background:none;border:0;color:#4cc7ec;padding:0;font:inherit}
+.it{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,46%);gap:10px;padding:6px 16px;border-left:3px solid transparent;cursor:pointer}
+.it.sel{background:#1e2a35;border-left-color:#4cc7ec}
+.it .l{color:#d9dee6}.it .v{color:#9ad8ee}
+.it.sub .l::before{content:"> ";color:#4cc7ec}
+.it.hd{color:#7d8695;font-size:12px;padding-top:12px;cursor:default}
+.it.info{cursor:default}.it.info .v{color:#c8ced8}
+.it .v.box{display:inline-block;background:#26303b;border:1px solid #3a4756;border-radius:3px;padding:0 8px;justify-self:start;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.it .v.chg{color:#ffd166}
+.it .star{color:#ffd166;margin-left:6px}
+.side{border-left:1px solid #2a2f37;background:#101317;padding:10px 12px;overflow-y:auto;font-size:13px}
+.side h4{margin:0 0 4px;font:600 13px "Barlow",system-ui,sans-serif;color:#4cc7ec}
+.side .help{color:#c4cad4;margin-bottom:12px;font:13px/1.45 "IBM Plex Sans",sans-serif}
+.hm{display:grid;grid-template-columns:1fr 1fr;gap:4px 8px}.hm div small{display:block;color:#7d8695;font-size:11px}.hm div{color:#e9edf2}
+.foot{position:absolute;bottom:0;left:0;right:0;height:30px;background:#0d0f12;border-top:1px solid #2a2f37;display:flex;align-items:center;gap:14px;padding:0 14px;font-size:12px;color:#8d95a3;overflow:hidden;white-space:nowrap}
+@media(max-width:700px){.foot .kh,.foot .vv{display:none}}
+/* EZ */
+.ez{position:absolute;top:var(--hdr,44px);bottom:30px;left:0;right:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:12px;overflow-y:auto;align-content:start}
+@media(max-width:700px){.ez{grid-template-columns:minmax(0,1fr)}}
+.pan{background:#181c22;border:1px solid #2a2f37;border-radius:6px;padding:10px 12px}
+.pan h3{margin:0 0 6px;font:600 15px "Barlow",system-ui,sans-serif;color:#fff}
+.pan p{margin:2px 0;color:#bcc3ce;font-size:13px}
+.pan .big{font:600 26px "Barlow",system-ui,sans-serif;color:#9ad8ee}.pan .big.bad{color:#ff7b72}
+.bo{display:flex;align-items:center;gap:6px;background:#222831;border:1px solid #333b46;border-radius:4px;padding:5px 6px;margin:4px 0;font-size:13px}
+.bo span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bo button,.ezb button{background:#2d3540;border:1px solid #3c4552;color:#dfeaf2;border-radius:4px;min-height:30px;padding:3px 9px}
+.bo button{width:32px;padding:0}
+.ezb{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.ezb button.on{border-color:#4cc7ec;color:#fff;background:#0b5a76}
+.span2{grid-column:span 2}@media(max-width:700px){.span2{grid-column:auto}}
+/* dialogs */
+.ov{position:absolute;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;z-index:5;padding:12px;overflow:auto}
+.dlg{background:#1a1e24;border:1px solid #4cc7ec;border-radius:6px;max-width:540px;width:100%;padding:14px 16px;box-shadow:0 10px 40px #000;max-height:100%;overflow:auto}
+.dlg h3{margin:0 0 8px;font:600 17px "Barlow",system-ui,sans-serif;color:#fff}
+.dlg p{margin:6px 0;color:#c9cfd8;font:13.5px/1.45 "IBM Plex Sans",sans-serif}
+.dlg .warn{color:#ff8a80}
+.dlg .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+.dlg .acts button{background:#26303b;border:1px solid #3a4756;color:#fff;border-radius:4px;padding:7px 14px;min-height:36px}
+.dlg .acts button.pri{background:#0b6f91;border-color:#4cc7ec}
+.opt{display:block;width:100%;text-align:left;background:#222831;border:1px solid #333b46;color:#dde;border-radius:4px;padding:8px 10px;margin:4px 0}
+.opt.cur{border-color:#4cc7ec;color:#fff}
+.opt:focus-visible{background:#0b5a76}
+.dlg table{width:100%;border-collapse:collapse;font-size:13px}.dlg td,.dlg th{padding:4px 6px;border-bottom:1px solid #2a2f37;text-align:left;color:#c9cfd8}.dlg td.n{color:#ffd166}
+.dlg input{width:100%;font:16px "IBM Plex Mono",monospace;background:#0f1215;color:#fff;border:1px solid #3a4756;border-radius:4px;padding:6px 8px;margin:3px 0 6px;color-scheme:dark}
+.dlg label{font-size:13px;color:#9aa3b1}
+/* full-screen tools */
+.fl{position:absolute;inset:0;background:#0f1216;padding:14px 18px;font-size:14px;overflow:auto}
+.fl h2{font:700 20px "Barlow Condensed",system-ui,sans-serif;color:#fff;margin:0 0 10px}
+.flg{display:grid;grid-template-columns:200px minmax(0,1fr);gap:12px}
+@media(max-width:700px){.flg{grid-template-columns:minmax(0,1fr)}}
+.fl .box{border:1px solid #2f3640;border-radius:4px;padding:8px;background:#151a20}
+.fl .row{padding:5px 8px;border-radius:3px;display:flex;justify-content:space-between;gap:10px;background:none;border:0;color:inherit;width:100%;text-align:left}
+.fl button.row:hover{background:#1e2a35}.fl .row.on{background:#0b6f91;color:#fff}
+.fl .info{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:13px;margin-bottom:10px}.fl .info b{color:#9ad8ee;font-weight:500}
+.prog{height:14px;background:#222;border-radius:3px;overflow:hidden;margin:6px 0}.prog i{display:block;height:100%;width:0;background:#4cc7ec}
+.qf{display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:14px}
+@media(max-width:700px){.qf{grid-template-columns:minmax(0,1fr)}}
+.qf svg{width:100%;height:auto;background:#151a20;border:1px solid #2f3640;border-radius:4px}
+.qf .ezb{flex-direction:column}.qf .ezb button{text-align:left}
+
+/* ---------- panelen rechts ---------- */
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+.card h2{font:700 22px/1.1 "Barlow",system-ui,sans-serif;margin:0 0 4px}
+.card .meta{color:var(--mute);font-size:13px;margin:0 0 10px}
+.pbar{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin-bottom:12px}.pbar i{display:block;height:100%;background:var(--ok);width:0;transition:width .3s}
+ol.ms{list-style:none;padding:0;margin:0;counter-reset:m}
+ol.ms li{border-top:1px solid var(--line);padding:10px 0 10px 34px;position:relative;counter-increment:m}
+ol.ms li::before{content:counter(m);position:absolute;left:0;top:10px;width:24px;height:24px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:12px;font-weight:600;color:var(--mute)}
+ol.ms li.done::before{content:"✓";background:var(--ok);border-color:var(--ok);color:#fff}
+ol.ms li.cur{background:light-dark(#eef8fc,#14232b);margin:0 -16px;padding-left:50px;padding-right:16px}
+ol.ms li.cur::before{left:16px;border-color:var(--acc);color:var(--acc)}
+ol.ms b{display:block;font-size:15px}
+ol.ms p{margin:2px 0 0;font-size:14px;color:var(--mute)}
+.q{font-size:12px;color:var(--acc);font-weight:600}
+ol.ms form{display:flex;gap:6px;margin-top:6px}
+.card input{flex:1;font:16px "IBM Plex Sans",sans-serif;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);min-height:40px}
+.sbtn{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;padding:6px 12px;min-height:40px}
+.sbtn.pri{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+.fb{font-size:13px;margin-top:4px}.fb.no{color:var(--bad)}.fb.yes{color:var(--ok)}
+.sc{display:grid;gap:8px}
+.scn{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;text-align:left;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:9px 12px}
+.scn b{font-size:14.5px}.scn small{color:var(--mute);grid-column:1}.scn .r{grid-row:1/3;grid-column:2;align-self:center;font-weight:700;color:var(--ok);white-space:nowrap}
+.ticket{border:1px dashed var(--line);border-radius:10px;padding:12px;margin:8px 0;background:var(--bg)}
+.ticket .from{font-size:12px;color:var(--mute)}
+.ticket blockquote{margin:6px 0 0;font-size:15px}
+.timer{font:600 28px "Barlow",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.hints{margin:8px 0;padding-left:20px;font-size:14px}.hints li{margin:4px 0}
+.row2{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.result{border-radius:10px;padding:12px;margin-top:10px;background:light-dark(#e9f7ef,#12261b);border:1px solid var(--ok)}
+.result.fail{background:light-dark(#fdecea,#2a1513);border-color:var(--bad)}
+.result h3{margin:0 0 4px;font:700 18px "Barlow",system-ui,sans-serif}
+
+/* ---------- VM-gids ---------- */
+.doc{max-width:980px}
+.doc h2{font:700 28px/1.1 "Barlow",system-ui,sans-serif;margin:8px 0 6px}
+.doc h3{font:700 20px/1.2 "Barlow",system-ui,sans-serif;margin:22px 0 6px}
+.doc p,.doc li{max-width:72ch}
+.cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:10px}
+@media(max-width:900px){.cols{grid-template-columns:minmax(0,1fr)}}
+.cols .card h3{margin-top:0}.cols ol{padding-left:20px;margin:6px 0}.cols li{margin:4px 0;font-size:15px}
+kbd{font:500 13px "IBM Plex Mono",monospace;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--card)}
+code{font:14px "IBM Plex Mono",monospace;background:light-dark(#eef0f3,#20242b);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+table.map{width:100%;border-collapse:collapse;margin-top:8px;background:var(--card)}
+table.map th,table.map td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top;font-size:15px}
+table.map th{font-size:13px;color:var(--mute);font-weight:600}
+.y{color:var(--ok);font-weight:600}.n{color:var(--bad);font-weight:600}.p{color:var(--warn);font-weight:600}
+@media(max-width:600px){table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:8em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:7.5em;margin-inline-start:-8em;white-space:normal;color:var(--mute)}.stack td:empty{display:none}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+</head>
+<body>
+<header>
+  <h1>BIOS-oefenomgeving</h1>
+  <p class="sub">Oefen veilig in een gesimuleerde UEFI-BIOS. Niets kan stuk. Los daarna storingen op, en voer de stappen uit op je eigen virtuele machine.</p>
+  <nav>
+    <a href="#sim" id="n-sim">1. Oefenen</a>
+    <a href="#storing" id="n-storing">2. Storingsmodus</a>
+    <a href="#vm" id="n-vm">3. Nu op je VM</a>
+  </nav>
+</header>
+<main>
+<section class="view" id="v-sim">
+ <div class="grid">
+  <div>
+   <div class="monitor">
+    <div id="scr" tabindex="0" aria-label="Gesimuleerd pc-scherm. Klik erop en gebruik het toetsenbord."></div>
+    <div class="keys" id="keys"></div>
+   </div>
+   <div class="case">
+    <h3>In de pc-kast</h3>
+    <p>Hardware wijzig je alleen als de pc uit staat. De USB-stick mag er altijd in en uit.</p>
+    <div class="hw" id="hw"></div>
+    <div class="hwnote" id="hwnote" role="status"></div>
+   </div>
+   <p class="note">Fictief moederbord "LAB H310M-A" (Intel H310-chipset). Indeling, menu's, meldingen en sneltoetsen zijn gebaseerd op de ASUS UEFI-BIOS van de klas-pc's (ASUS H310M-A R2.0). Klik op het scherm om het toetsenbord te gebruiken: pijltjes, Enter, Esc, DEL, F1–F12.</p>
+  </div>
+  <aside class="card" id="aside" aria-live="polite"></aside>
+ </div>
+</section>
+
+<section class="view" id="v-vm">
+ <div class="doc">
+  <h2>Dezelfde stappen op je virtuele machine</h2>
+  <p>Een VM heeft een eigen, eenvoudige "virtuele BIOS". Die ziet er anders uit dan de BIOS van de klas-pc, maar de begrippen blijven dezelfde: POST, bootvolgorde, Secure Boot, paswoorden en standaardwaarden. Kies hieronder het programma dat je gebruikt.</p>
+  <div class="cols">
+   <div class="card">
+    <h3>VMware Workstation</h3>
+    <p class="meta">Klassieke Phoenix-BIOS (legacy) of UEFI</p>
+    <ol>
+     <li>Zet de VM uit. Kies <b>VM › Power › Power On to Firmware</b>. Je komt meteen in de BIOS, zonder te moeten timen.</li>
+     <li>Of: start de VM, klik in het venster en druk snel op <kbd>F2</kbd>. Te snel? Zet <code>bios.bootDelay = "5000"</code> in het .vmx-bestand (5 seconden wachten).</li>
+     <li>Legacy BIOS: tabbladen <b>Main, Advanced, Security, Boot, Exit</b>. Bij <b>Security</b> zie je Supervisor- en User Password. Bekijk ze, stel niets in.</li>
+     <li>Bootvolgorde: tab <b>Boot</b>, item selecteren en verplaatsen met <kbd>+</kbd> / <kbd>-</kbd>.</li>
+     <li>Secure Boot: VM uitzetten › <b>Settings › Options › Advanced</b> › Firmware type <b>UEFI</b> › vink <b>Enable secure boot</b> aan.</li>
+     <li>Standaardwaarden: tab <b>Exit › Load Setup Defaults</b>, daarna <kbd>F10</kbd> om op te slaan.</li>
+    </ol>
+   </div>
+   <div class="card">
+    <h3>VirtualBox</h3>
+    <p class="meta">Legacy BIOS of EFI (OVMF)</p>
+    <ol>
+     <li>Legacy BIOS heeft geen instelscherm. Je kunt bij het opstarten alleen <kbd>F12</kbd> drukken voor het bootmenu.</li>
+     <li>Zet de VM uit › <b>Instellingen › Systeem › Moederbord</b> › vink <b>EFI inschakelen</b> aan.</li>
+     <li>Start de VM en druk meteen herhaaldelijk op <kbd>F2</kbd> of <kbd>Esc</kbd>. Je komt in het EFI-instelscherm met <b>Device Manager, Boot Manager, Boot Maintenance Manager</b>.</li>
+     <li>Bootvolgorde: via <b>Boot Maintenance Manager › Boot Options › Change Boot Order</b>, of in de VM-instellingen bij <b>Opstartvolgorde</b>.</li>
+     <li>Secure Boot (VirtualBox 7): <b>Instellingen › Systeem › Moederbord › Secure Boot inschakelen</b> (EFI moet aan staan).</li>
+     <li>Zet EFI na de oefening terug zoals het was. Een geïnstalleerde Windows-VM start niet meer als je de firmware-modus verandert.</li>
+    </ol>
+   </div>
+   <div class="card">
+    <h3>Hyper-V</h3>
+    <p class="meta">Generatie 2 = UEFI, generatie 1 = BIOS</p>
+    <ol>
+     <li>Hyper-V heeft geen BIOS-scherm in de VM. Alles staat in <b>Instellingen</b> van de VM (VM eerst uitzetten).</li>
+     <li>Generatie 2: <b>Security › Enable Secure Boot</b>, met de template <b>Microsoft Windows</b>.</li>
+     <li>Bootvolgorde: <b>Firmware</b> (gen. 2) of <b>BIOS</b> (gen. 1), verplaatsen met Move Up / Move Down.</li>
+     <li>TPM: <b>Security › Enable Trusted Platform Module</b> (nodig voor Windows 11).</li>
+    </ol>
+   </div>
+  </div>
+  <h3>In Windows (in je VM) controleren</h3>
+  <ul>
+   <li><b>Secure Boot-status en BIOS-modus:</b> druk <kbd>Win</kbd>+<kbd>R</kbd>, typ <code>msinfo32</code>, Enter. Kijk bij <b>Systeemoverzicht</b> naar <b>Status van beveiligd opstarten</b> en <b>BIOS-modus</b> (UEFI of Verouderd). Dat is het antwoord op vraag 19.</li>
+   <li>Alternatief in PowerShell als administrator: <code>Confirm-SecureBootUEFI</code> geeft True of False.</li>
+   <li><b>BIOS-versie zonder herstarten</b> (opdracht 2): <code>msinfo32</code> › BIOS-versie/-datum, of PowerShell <code>Get-CimInstance Win32_BIOS</code>, of het programma Speccy › Motherboard › BIOS.</li>
+   <li><b>Screenshots</b> voor je opdracht: <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> (Knipprogramma) werkt ook op het VM-venster terwijl de VM in de BIOS staat.</li>
+  </ul>
+  <h3>Welke vraag doe je waar?</h3>
+  <table class="map stack">
+   <thead><tr><th>Vraag</th><th>Simulator</th><th>Op je VM</th><th>Opmerking</th></tr></thead>
+   <tbody>
+    <tr><td>Opdr. 1, vraag 1–17 (theorie)</td><td class="p">deels</td><td class="n">nee</td><td>Simulator toont POST, pieptonen, CMOS-fouten, bootvolgorde en flashen.</td></tr>
+    <tr><td>18 Secure Boot</td><td class="y">ja</td><td class="y">ja</td><td>VMware/VirtualBox/Hyper-V: in de VM-instellingen.</td></tr>
+    <tr><td>19 Status beveiligd opstarten</td><td class="p">ja</td><td class="y">ja</td><td>Simulator toont een msinfo32-overzicht na het opstarten. In de VM: <code>msinfo32</code>.</td></tr>
+    <tr><td>20 EZ mode / Advanced mode</td><td class="y">ja</td><td class="n">nee</td><td>Een VM heeft geen EZ mode. Screenshot uit de simulator.</td></tr>
+    <tr><td>21 Paswoorden</td><td class="y">ja</td><td class="p">VMware</td><td>VMware legacy BIOS › Security. Stel GEEN paswoord in.</td></tr>
+    <tr><td>22 Paswoord wissen</td><td class="y">ja</td><td class="p">VMware</td><td>Echte pc: CMOS wissen (CLRTC-jumper of batterij). VMware: het .nvram-bestand van de VM verwijderen zet de BIOS terug.</td></tr>
+    <tr><td>Opdr. 2 BIOS updaten</td><td class="y">ja</td><td class="n">nee</td><td>Een VM-BIOS wordt meegeleverd met VMware/VirtualBox en kun je niet flashen. Versie opzoeken kan wel.</td></tr>
+    <tr><td>Defaults terugzetten</td><td class="y">ja</td><td class="y">ja</td><td>Altijd op het einde van de les.</td></tr>
+   </tbody>
+  </table>
+ </div>
+</section>
+</main>
+
+<script>
+{
+const $=s=>document.querySelector(s);
+const scr=$('#scr');
+const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clone=o=>JSON.parse(JSON.stringify(o));
+
+/* ================= model ================= */
+const DEV={ssd:'Windows Boot Manager (SATA6G_1: Samsung SSD 860 EVO 250GB)',dvd:'SATA6G_2: HL-DT-ST DVDRAM GH24NSD1',usb:'UEFI: SanDisk Ultra USB 3.0 16GB, Partition 1',pxe:'UEFI: PXE IPv4 Intel(R) Ethernet Connection I219-V'};
+const DEF={lang:'English',ezTune:'Normal',xmp:'Disabled',ratio:'Auto',vtx:'Disabled',sata:'AHCI',p1:'Enabled',hp1:'Disabled',p2:'Enabled',hp2:'Disabled',ptt:'Enabled',acloss:'Power Off',hdaudio:'Enabled',lan:'Enabled',netstack:'Disabled',pxe4:'Enabled',fastboot:'Enabled',numlock:'On',logo:'Enabled',waitf1:'Enabled',csm:'Disabled',csmdev:'UEFI and Legacy OPROM',csmstor:'UEFI driver first',ostype:'Windows UEFI mode',keys:'Installed',fan:'Standard',boot:['ssd','dvd','usb','pxe']};
+const VER={'1203':'06/14/2023','1401':'09/30/2024'};
+const LBL={lang:'System Language',ezTune:'EZ System Tuning',xmp:'Ai Overclock Tuner',ratio:'CPU Core Ratio',vtx:'Intel (VMX) Virtualization Technology',sata:'SATA Mode Selection',p1:'SATA6G_1 Port',hp1:'SATA6G_1 Hot Plug',p2:'SATA6G_2 Port',hp2:'SATA6G_2 Hot Plug',ptt:'PTT',acloss:'Restore AC Power Loss',hdaudio:'HD Audio Controller',lan:'Intel LAN Controller',netstack:'Network Stack',pxe4:'Ipv4 PXE Support',fastboot:'Fast Boot',numlock:'Bootup NumLock State',logo:'Boot Logo Display',waitf1:"Wait For 'F1' If Error",csm:'Launch CSM',csmdev:'Boot Devices Control',csmstor:'Boot from Storage Devices',ostype:'OS Type',keys:'Key Management',fan:'CPU Fan Profile'};
+const fresh=()=>({ver:'1203',saved:clone(DEF),cur:clone(DEF),adminPw:'',userPw:'',profile:null,timeOff:0,log:[],favs:[['CPU','Intel (VMX) Virtualization Technology'],['Boot','Fast Boot'],['CSM','Launch CSM']],hw:{ram:true,fan:true,bat:true,usb:'data'},pend:[]});
+
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const SV=store.get('biosSim2')||{};
+let ST={oefen:SV.oefen||fresh(),storing:SV.storing||fresh()};
+let F=SV.F||{};
+let G=SV.G||{scores:{},active:null};
+let view='oefen';
+let st=ST.oefen;
+const persist=()=>store.set('biosSim2',{oefen:ST.oefen,storing:ST.storing,F,G});
+const flag=k=>{if(view==='oefen'&&!F[k]){F[k]=true;persist();renderAside()}};
+
+let ui={mode:'off',adv:false,tab:'Main',stack:[],sel:0,dlg:null,timer:null,access:'Administrator',override:null,errs:[],flash:null,qfan:null,ret:null,winMsg:'',bootLines:[],pwTries:0,pwFor:'',shots:0};
+const now=()=>new Date(Date.now()+st.timeOff);
+const secOn=s=>s.csm==='Disabled'&&s.ostype==='Windows UEFI mode'&&s.keys==='Installed';
+const present=s=>s.boot.filter(id=>id==='ssd'?s.p1==='Enabled':id==='dvd'?s.p2==='Enabled':id==='usb'?st.hw.usb!=='none':s.lan==='Enabled'&&s.netstack==='Enabled'&&s.pxe4==='Enabled');
+const sameDef=s=>JSON.stringify(s)===JSON.stringify(DEF);
+const devName=id=>id==='usb'&&st.hw.usb==='install'?'UEFI: SanDisk Ultra USB 3.0 16GB (Windows Setup)':DEV[id];
+
+/* ================= opdrachten (oefenmodus) ================= */
+const M=[
+ {t:'Kom in de BIOS',d:'Zet de pc aan en druk tijdens het opstartlogo op DEL of F2. Te laat? Druk op de reset-knop.',q:'Opdr. 1 – inleiding',ok:()=>F.entered},
+ {t:'Wat is de BIOS-versie?',d:'Zoek het in EZ mode of bij Advanced › Main. Typ het versienummer.',q:'Opdr. 2 – vraag 1',ask:v=>v.replace(/\D/g,'')===ST.oefen.ver},
+ {t:'Hoeveel werkgeheugen zit er in de pc (in GB)?',d:'Total Memory staat in MB. Reken om naar GB.',q:'Opdr. 1 – vraag 20',ask:v=>parseFloat(v.replace(',','.'))===8},
+ {t:'Wissel tussen EZ mode en Advanced mode',d:'Gebruik F7. Vergelijk welke info je in elke modus ziet.',q:'Opdr. 1 – vraag 20',ok:()=>F.sawEZ&&F.sawAdv},
+ {t:'Zoek Secure Boot',d:'Open het Secure Boot-menu. Welke status staat er? Wat heeft CSM ermee te maken?',q:'Opdr. 1 – vraag 18',ok:()=>F.sawSecure},
+ {t:'Bekijk de paswoordopties, maar stel er geen in',d:'Zoek waar je een Administrator- en User Password kunt instellen. Wat is het verschil?',q:'Opdr. 1 – vraag 21',ok:()=>F.sawSecurity},
+ {t:'Zoek hoe je een vergeten paswoord wist',d:'Main › Security bevat een hint. Bekijk ook de CLRTC-jumper in de pc-kast.',q:'Opdr. 1 – vraag 22',ok:()=>F.sawClear},
+ {t:'Zet de USB-stick als eerste opstartapparaat en sla op',d:'Sla op met F10 en kijk wat er bij het opstarten gebeurt. Wissel daarna de stick voor de installatiestick en herstart. Wat is het verschil?',q:'Opdr. 1 – vraag 16',ok:()=>present(ST.oefen.saved)[0]==='usb'},
+ {t:'Schakel Intel Virtualization Technology in en sla op',d:'Nodig om virtuele machines te draaien. Tip: F9 = zoeken.',q:'Extra',ok:()=>ST.oefen.saved.vtx==='Enabled'},
+ {t:'Maak een back-up van je instellingen',d:'Tool › User Profile › Save to Profile 1, vóór je gaat updaten.',q:'Opdr. 1 – vraag 3',ok:()=>F.profileSaved},
+ {t:'Update de BIOS met EZ Flash',d:'Tool › EZ Flash 3 Utility. De datastick moet in de pc zitten. Zet de pc NIET uit tijdens het flashen.',q:'Opdr. 2',ok:()=>ST.oefen.ver==='1401'},
+ {t:'Zet je profiel terug na de update',d:'Na een update staan alle instellingen op fabriekswaarden. Laad je profiel en sla op.',q:'Opdr. 1 – vraag 3',ok:()=>{const o=ST.oefen;return F.profileLoaded&&o.ver==='1401'&&!!o.profile&&(F.defaultsAfter||JSON.stringify(o.saved)===JSON.stringify(o.profile.s))}},
+ {t:'Einde les: laad de standaardwaarden en sla op',d:'Load Optimized Defaults (F5) en daarna Save & Exit (F10).',q:'Opdr. 1 – slot',ok:()=>F.profileLoaded&&sameDef(ST.oefen.saved)&&F.defaultsAfter}
+];
+const isDone=(m,i)=>m.ask?!!F['ans'+i]:!!m.ok();
+
+/* ================= storingen (spelmodus) ================= */
+const winOK=()=>outcome(st.saved).end==='win';
+const SC=[
+ {id:'nodev',st:1,t:'Geen opstartapparaat',k:'Sinds gisteren start mijn pc niet meer op. Er staat iets met "Reboot and Select proper Boot device". Mijn neefje heeft "iets in de BIOS aangezet voor een oud spelletje".',set:s=>{s.saved.csm='Enabled';s.saved.csmstor='Legacy only'},chk:()=>winOK(),h:['Lees de melding: de pc vindt geen schijf waarvan hij kan opstarten.','Windows is in UEFI-modus geïnstalleerd. Kijk bij Boot › CSM.','Zet Launch CSM op Disabled (of Boot from Storage Devices op UEFI driver first) en sla op.'],u:'CSM (legacy-modus) stond aan met "Legacy only" voor schijven. Een Windows die in UEFI/GPT-modus geïnstalleerd is, wordt dan niet gevonden.'},
+ {id:'bsod',st:1,t:'Blauw scherm bij opstarten',k:'Een collega heeft "de SSD sneller gezet" in de BIOS. Nu krijg ik bij elke start een blauw scherm met INACCESSIBLE_BOOT_DEVICE.',set:s=>{s.saved.sata='Intel RST Premium'},chk:()=>winOK(),h:['INACCESSIBLE_BOOT_DEVICE: Windows kan de opstartschijf niet meer aanspreken.','Kijk hoe de SATA-controller ingesteld staat (Advanced › PCH Storage Configuration).','Zet SATA Mode Selection terug op AHCI en sla op.'],u:'De SATA-modus werd gewijzigd na de installatie van Windows. Windows heeft dan geen driver geladen voor de nieuwe modus.'},
+ {id:'pxe',st:1,t:'Opstarten duurt eeuwig',k:'Mijn pc doet er lang over om op te starten. Ik zie eerst "Start PXE over IPv4" en "No offer received" voor Windows eindelijk start.',set:s=>{s.saved.netstack='Enabled';s.saved.boot=['pxe','dvd','ssd','usb']},chk:()=>winOK()&&present(st.saved)[0]==='ssd',h:['PXE = opstarten via het netwerk. Daar wacht de pc eerst op.','Bekijk de bootvolgorde.','Zet de Windows Boot Manager (SSD) als Boot Option #1 en sla op. Ook het DVD-station kost tijd!'],u:'De pc probeerde eerst via het netwerk (PXE) en het DVD-station op te starten en verloor daar telkens tijd.'},
+ {id:'w11',st:2,t:'Windows 11 weigert',k:'De Windows 11-upgrade zegt dat mijn pc niet voldoet: "TPM 2.0" en "Secure Boot" zouden ontbreken. De pc is nochtans maar een paar jaar oud.',set:s=>{s.saved.ptt='Disabled';s.saved.ostype='Other OS'},chk:()=>st.saved.ptt==='Enabled'&&secOn(st.saved)&&winOK(),h:['Twee dingen ontbreken: een TPM en Secure Boot. Allebei instellingen in de BIOS.','TPM = PTT bij Advanced › PCH-FW Configuration. Secure Boot zit onder Boot.','Zet PTT op Enabled en OS Type op Windows UEFI mode. Sla op en controleer het msinfo32-overzicht.'],u:'De firmware-TPM (Intel PTT) stond uit en Secure Boot was uitgeschakeld via OS Type "Other OS".'},
+ {id:'vtx',st:1,t:'VirtualBox start geen VM',k:'Ik wil VirtualBox gebruiken voor de les, maar ik krijg "VT-x is not available". Op mijn laptop werkt het wel.',set:s=>{s.saved.vtx='Disabled'},chk:()=>st.saved.vtx==='Enabled',h:['VT-x is een functie van de processor.','Zoek bij Advanced › CPU Configuration (of druk F9 en zoek "virtual").','Zet Intel (VMX) Virtualization Technology op Enabled en sla op.'],u:'Virtualisatie (VT-x) staat standaard uit op veel moederborden.'},
+ {id:'devices',st:2,t:'Geen geluid en geen internet',k:'Na een "opkuisbeurt" heb ik geen geluid meer en geen netwerk. In Apparaatbeheer zijn de geluidskaart en netwerkkaart gewoon verdwenen.',set:s=>{s.saved.hdaudio='Disabled';s.saved.lan='Disabled'},chk:()=>st.saved.hdaudio==='Enabled'&&st.saved.lan==='Enabled',h:['Als een apparaat helemaal niet meer in Windows verschijnt, staat het misschien uit in de BIOS.','Advanced › Onboard Devices Configuration.','Zet HD Audio Controller en Intel LAN Controller op Enabled en sla op.'],u:'De ingebouwde audio- en netwerkcontroller waren uitgeschakeld in de BIOS. Windows ziet ze dan niet.'},
+ {id:'fan',st:2,t:'CPU Fan Error',k:'Bij elke start staat er "CPU Fan Error! Press F1 to Run SETUP". Als ik F1 druk en daarna Save & Exit kies, start hij wel. Kun je die melding wegwerken?',set:s=>{s.hw.fan=false},chk:()=>st.hw.fan&&winOK(),h:['Kijk in de BIOS naar Monitor › CPU Fan Speed.','N/A betekent: geen signaal van de ventilator. Dat is geen instelling, maar hardware.','Zet de pc uit en sluit de CPU-ventilator aan in de pc-kast. De melding verbergen met Wait For F1 is géén oplossing: de CPU kan oververhitten.'],u:'De CPU-ventilator was niet aangesloten op de CPU_FAN-aansluiting. De BIOS waarschuwt omdat de processor anders oververhit raakt.'},
+ {id:'cmos',st:2,t:'Datum klopt nooit',k:'Telkens als ik de stekker uittrek, staat de datum in 2018 en vraagt de pc om F1 te drukken. Mijn instellingen zijn dan ook weg.',set:s=>{s.hw.bat=false;s.timeOff=new Date(2018,0,1).getTime()-Date.now();s.pend=['The CMOS battery has failed.','CMOS Date/Time Not Set.']},chk:()=>st.hw.bat&&Math.abs(st.timeOff)<36e5*36,h:['Instellingen en klok worden bewaard in het CMOS. Wat houdt het CMOS onder spanning als de stekker eruit is?','De CMOS-batterij (CR2032) is leeg.','Pc uit, batterij vervangen in de pc-kast, opstarten, datum en tijd juist zetten in Main en opslaan.'],u:'De CMOS-batterij was leeg. Zonder batterij verliest het CMOS de instellingen en de klok zodra de stroom wegvalt.'},
+ {id:'ssd',st:2,t:'SSD verdwenen',k:'Na het opruimen van de kabels vindt de pc mijn SSD niet meer. De kabels zitten nochtans goed, dat heb ik drie keer gecontroleerd.',set:s=>{s.saved.p1='Disabled'},chk:()=>st.saved.p1==='Enabled'&&winOK(),h:['Bekijk in EZ mode of Advanced welke schijven de BIOS ziet.','Een SATA-poort kan uitgeschakeld worden. Kijk bij Advanced › PCH Storage Configuration.','Zet SATA6G_1 Port op Enabled en sla op.'],u:'De SATA-poort waarop de SSD zit, was uitgeschakeld in de BIOS.'},
+ {id:'setup',st:1,t:'Steeds Windows-installatie',k:'Elke keer als ik de pc aanzet, start de Windows-installatie in plaats van gewoon Windows. Ik heb Windows nochtans al geïnstalleerd.',set:s=>{s.hw.usb='install';s.saved.boot=['usb','ssd','dvd','pxe']},chk:()=>winOK(),h:['Waar start de pc van op?','De installatiestick staat bovenaan in de bootvolgorde.','Zet de SSD bovenaan en sla op, of haal de stick uit de pc.'],u:'De installatiestick zat nog in de pc en stond als eerste in de bootvolgorde.'},
+ {id:'keys',st:3,t:'Secure Boot staat uit',k:'Een programma voor examens (met anti-cheat) zegt dat Secure Boot uit staat. CSM staat uit en OS Type is Windows UEFI mode, dus ik snap het niet.',set:s=>{s.saved.keys='Cleared'},chk:()=>secOn(st.saved)&&winOK(),h:['Secure Boot heeft drie voorwaarden. Twee zijn in orde.','Bekijk de Platform Key (PK) state in het Secure Boot-menu.','Zet Key Management op Installed (standaardsleutels) en sla op.'],u:'De Secure Boot-sleutels waren gewist. Zonder Platform Key is Secure Boot niet actief.'},
+ {id:'pw',st:3,t:'Onbekend paswoord',k:'Een vorige gebruiker heeft een BIOS-paswoord ingesteld. Bij het opstarten wordt het al gevraagd en niemand kent het.',set:s=>{s.adminPw='x7Kq!9';s.userPw='Lente24'},chk:()=>!st.adminPw&&!st.userPw&&winOK(),h:['Raden heeft geen zin: na 3 pogingen stopt de pc.','Het paswoord staat in het CMOS. Hoe wis je het CMOS?','Pc uit en de CLRTC-jumper overbruggen in de pc-kast. Daarna opstarten, F1 en de instellingen controleren.'],u:'Een BIOS-paswoord wis je door het CMOS te wissen met de CLRTC-jumper (of door de batterij even te verwijderen).'}
+];
+const scoreOf=a=>{const secs=Math.round((Date.now()-a.start)/1000);return{secs,pts:Math.max(10,100-15*a.hints-5*a.fails-Math.max(0,Math.floor((secs-120)/20)))}};
+
+/* ================= menu ================= */
+const sel=(l,k,o,h)=>({ty:'sel',l,k,o,h});
+const info=(l,v,h)=>({ty:'info',l,v,h});
+const sub=(l,p,h,flg)=>({ty:'sub',l,p,h,flg});
+const act=(l,fn,h)=>({ty:'act',l,fn,h});
+const hd=l=>({ty:'hd',l});
+const ED=['Enabled','Disabled'];
+const fmtD=d=>d.toLocaleDateString('en-US',{weekday:'short',month:'2-digit',day:'2-digit',year:'numeric'});
+const fmtT=d=>d.toLocaleTimeString('en-GB');
+const P={
+ Main:()=>[hd('BIOS Information'),info('BIOS Version',st.ver+' x64','De versie van de firmware. Vergelijk met de nieuwste versie op de website van de fabrikant.'),info('Build Date',VER[st.ver]),info('ME FW Version','11.8.92.4222'),info('Board Model','LAB H310M-A'),
+  hd('Processor Information'),info('Brand String','Intel(R) Core(TM) i3-8100 CPU @ 3.60GHz'),info('Total Memory',st.hw.ram?'8192 MB':'0 MB','Het totale werkgeheugen in megabytes. 1024 MB = 1 GB.'),info('Memory Frequency','2400 MHz'),
+  sel('System Language','lang',['English','Français','Deutsch'],'Taal van de BIOS-menu\'s.'),act('System Date: '+fmtD(now()),dateDlg,'De datum wordt bijgehouden door de RTC-klok, gevoed door de CMOS-batterij. Enter om te wijzigen.'),act('System Time: '+fmtT(now()),dateDlg,'Enter om de tijd te wijzigen.'),
+  info('Access Level',ui.access,'Met het User Password kom je binnen met beperkte rechten: je kunt dan bijna niets wijzigen.'),sub('Security','Security','Paswoorden instellen om de BIOS of de pc te beveiligen.')],
+ Security:()=>[info('Administrator Password',st.adminPw?'Installed':'Not Installed','Administrator (supervisor) paswoord: beschermt de BIOS-instellingen. Wordt gevraagd bij het openen van de BIOS.'),info('User Password',st.userPw?'Installed':'Not Installed','User paswoord: wordt gevraagd bij elke start van de pc, nog voor Windows laadt.'),
+  act('Administrator Password',()=>pwDlg('adminPw'),'Instellen van het Administrator paswoord. In de klas: NIET doen!'),act('User Password',()=>pwDlg('userPw'),'Instellen van het User paswoord. In de klas: NIET doen!'),
+  sub('Paswoord vergeten?','Clear','Wat als niemand het paswoord nog kent?','sawClear')],
+ Clear:()=>[info('Clear CMOS','zie uitleg rechts','Een vergeten BIOS-paswoord wis je door het CMOS te wissen. 1) Pc uit, stekker eruit. 2) Overbrug de CLRTC-jumper (2 pinnen op het moederbord, zie handleiding) 5 à 10 seconden, of haal de CMOS-batterij (CR2032) er enkele minuten uit. 3) Alle instellingen staan dan terug op fabriekswaarden, ook datum en tijd. In deze simulator: knop "CLRTC-jumper" in de pc-kast.')],
+ 'Ai Tweaker':()=>[info('Target CPU Speed','3600 MHz'),info('Target DRAM Frequency','2400 MHz'),sel('Ai Overclock Tuner','xmp',['Disabled','XMP I'],'XMP laat het RAM lopen op de snelheid die op het geheugen geprogrammeerd staat.'),sel('CPU Core Ratio','ratio',['Auto','Sync All Cores'],'De vermenigvuldiger van de processor. Een i3-8100 met H310-chipset is niet overklokbaar.'),info('CPU Core Voltage','Auto')],
+ Advanced:()=>[sub('CPU Configuration','CPU','Instellingen van de processor, o.a. virtualisatie.'),sub('PCH Storage Configuration','Storage','SATA-modus en SATA-poorten.'),sub('Onboard Devices Configuration','Onboard','Geluid, netwerk en andere ingebouwde onderdelen aan/uit.'),sub('APM Configuration','APM','Gedrag na stroomuitval.'),sub('PCH-FW Configuration','PTT','Firmware-TPM (Intel PTT), nodig voor Windows 11.'),sub('Network Stack Configuration','Net','Opstarten via het netwerk (PXE).'),sub('USB Configuration','USB','USB-instellingen.')],
+ CPU:()=>[info('Intel(R) Core(TM) i3-8100 CPU','4 cores, 4 threads'),info('L3 Cache','6 MB'),sel('Intel (VMX) Virtualization Technology','vtx',ED,'VT-x laat de processor virtuele machines efficiënt draaien. Moet aan staan voor VMware, VirtualBox en Hyper-V.'),info('Hyper-Threading','Not Supported')],
+ Storage:()=>[sel('SATA Mode Selection','sata',['AHCI','Intel RST Premium'],'AHCI is de standaard. Pas op: als je dit wijzigt nadat Windows geïnstalleerd is, start Windows niet meer (blauw scherm).'),sub('SATA6G_1 (Samsung SSD 860 EVO 250GB)','Port1','Instellingen van SATA-poort 1.'),sub('SATA6G_2 (HL-DT-ST DVDRAM GH24NSD1)','Port2','Instellingen van SATA-poort 2.'),info('SATA6G_3','Empty'),info('SATA6G_4','Empty'),info('M.2_1','Empty','Het M.2-slot ondersteunt SATA- en PCIe-SSD\'s. Op dit bord is het leeg.')],
+ Port1:()=>[sel('SATA6G_1 Port','p1',ED,'Disabled: de poort is uitgeschakeld en de schijf erop is onzichtbaar voor de BIOS en Windows.'),sel('SATA6G_1 Hot Plug','hp1',ED,'Hot Plug: schijf mag aangesloten/losgekoppeld worden terwijl de pc aan staat.'),info('SATA Device Type','Solid State Drive')],
+ Port2:()=>[sel('SATA6G_2 Port','p2',ED,'Disabled: het DVD-station is onzichtbaar.'),sel('SATA6G_2 Hot Plug','hp2',ED),info('SATA Device Type','Optical Drive')],
+ Onboard:()=>[sel('HD Audio Controller','hdaudio',ED,'Het ingebouwde geluid. Disabled: Windows ziet geen geluidskaart.'),sel('Intel LAN Controller','lan',ED,'De ingebouwde netwerkkaart. Disabled: geen netwerk in Windows.')],
+ APM:()=>[sel('Restore AC Power Loss','acloss',['Power Off','Power On','Last State'],'Wat doet de pc als de stroom terugkomt na een stroompanne? Handig voor servers: Power On.')],
+ PTT:()=>[sel('PTT','ptt',ED,'Intel Platform Trust Technology = een TPM 2.0 in firmware. Windows 11 vereist TPM 2.0 en een pc die Secure Boot ondersteunt.')],
+ Net:()=>{const a=[sel('Network Stack','netstack',ED,'Enabled: de pc kan opstarten via het netwerk (PXE). De netwerkkaart verschijnt dan in de bootvolgorde.')];if(st.cur.netstack==='Enabled')a.push(sel('Ipv4 PXE Support','pxe4',ED,'PXE over IPv4. Wordt gebruikt om pc\'s centraal te installeren in bedrijven en scholen.'));return a},
+ USB:()=>[info('USB Devices',(st.hw.usb==='none'?'0':'1')+' Drive, 1 Keyboard, 1 Mouse'),info('Legacy USB Support','Enabled'),...(st.hw.usb!=='none'?[info('SanDisk Ultra USB 3.0','Auto')]:[])],
+ Monitor:()=>{const m=mon();return[hd('Temperature Monitor'),info('CPU Temperature',m.ct+' °C','Boven 90 °C onder belasting? Controleer koelpasta en ventilator.'),info('MotherBoard Temperature',m.mt+' °C'),hd('Fan Speed Monitor'),info('CPU Fan Speed',m.cf,'N/A = geen signaal van de ventilator. Controleer of hij is aangesloten op CPU_FAN.'),info('Chassis Fan Speed','N/A'),act('Q-Fan Configuration (F6)',openQfan,'Ventilatorcurve instellen: hoe snel draait de ventilator bij welke temperatuur.'),hd('Voltage Monitor'),info('CPU Core Voltage',m.v+' V'),info('3.3V Voltage','3.344 V'),info('5V Voltage','5.040 V'),info('12V Voltage','12.096 V')]},
+ Boot:()=>{const pr=present(st.cur);return[sel('Fast Boot','fastboot',ED,'Slaat een deel van de hardwarecontroles over: sneller opstarten, maar je hebt minder tijd om DEL te drukken.'),sel('Bootup NumLock State','numlock',['On','Off']),sel('Boot Logo Display','logo',ED,'Enabled: je ziet het logo i.p.v. de POST-tekst. Disabled: je ziet wat de BIOS test.'),sel('Wait For \'F1\' If Error','waitf1',ED,'Bij een POST-fout wacht de pc tot je F1 drukt. Disabled verbergt de fout, maar lost ze niet op!'),
+  sub('CSM (Compatibility Support Module)','CSM','CSM emuleert een klassieke (legacy) BIOS voor oude besturingssystemen. Staat CSM aan, dan werkt Secure Boot niet.'),sub('Secure Boot','Secure','Secure Boot laat alleen opstartsoftware toe die digitaal ondertekend is. Zo kan malware (rootkits) niet starten vóór Windows.','sawSecure'),
+  hd('Boot Option Priorities'),...pr.map((id,i)=>({ty:'bootp',i,l:'Boot Option #'+(i+1),v:devName(id),h:'De bootvolgorde: in deze volgorde zoekt de BIOS naar een opstartbaar apparaat. Enter om een ander apparaat op deze plaats te zetten.'})),
+  hd('Boot Override'),...pr.map(id=>act(devName(id),()=>{ui.override=id;bootNow()},'Eenmalig van dit apparaat opstarten zonder de volgorde te wijzigen. Hetzelfde als het bootmenu (F8).'))]},
+ CSM:()=>{const a=[sel('Launch CSM','csm',ED,'Enabled: legacy-opstarten mogelijk (oude OS\'en, MBR-schijven). Secure Boot wordt dan uitgeschakeld. Windows 11 vereist CSM Disabled.')];if(st.cur.csm==='Enabled')a.push(sel('Boot Devices Control','csmdev',['UEFI and Legacy OPROM','Legacy OPROM only','UEFI only']),sel('Boot from Storage Devices','csmstor',['UEFI driver first','Legacy only','Ignore'],'Legacy only: schijven worden alleen in legacy-modus gestart. Een Windows die in UEFI-modus geïnstalleerd is, wordt dan NIET gevonden.'));return a},
+ Secure:()=>[info('Secure Boot state',secOn(st.cur)?'Enabled':'Disabled','Enabled = actief. Voorwaarden: CSM Disabled, OS Type "Windows UEFI mode" en sleutels geïnstalleerd.'),info('Platform Key (PK) state',st.cur.keys==='Installed'?'Loaded':'Unloaded','De Platform Key is de hoofdsleutel van Secure Boot. Unloaded = Secure Boot kan niet actief zijn.'),sel('OS Type','ostype',['Windows UEFI mode','Other OS'],'Windows UEFI mode: Secure Boot aan. Other OS: Secure Boot uit (bv. voor sommige Linux-versies).'),sel('Key Management','keys',['Installed','Cleared'],'De sleutels (PK, KEK, db, dbx) bepalen welke handtekeningen vertrouwd worden. Installed = standaardsleutels geladen.')],
+ Tool:()=>[act('EZ Flash 3 Utility',openFlash,'BIOS updaten (flashen) vanaf een USB-stick met het juiste .CAP-bestand.'),sub('User Profile','Profile','Je huidige BIOS-instellingen opslaan als back-up en later terugzetten.'),act('Secure Erase',()=>msg('Secure Erase','Wist een SSD volledig en zet hem terug naar fabrieksprestaties. Alle data is weg. Hier niet uitvoeren.'),'Volledig wissen van een SSD.'),act('SPD Information',()=>msg('SPD Information',st.hw.ram?'DIMM_A1: 8 GB DDR4-2400 (Kingston KVR24N17S8/8)<br>DIMM_B1: leeg':'Geen geheugen gevonden.'),'Info uit de chip op het RAM-geheugen.')],
+ Profile:()=>[info('Profile 1',st.profile?'Saved (BIOS '+st.profile.ver+')':'Empty'),act('Save to Profile 1',()=>{st.profile={ver:st.ver,s:clone(st.cur)};flag('profileSaved');persist();msg('Profiel opgeslagen','De huidige instellingen zijn bewaard als Profile 1.')},'Back-up nemen van de instellingen. Doe dit altijd vóór een BIOS-update.'),act('Load from Profile 1',loadProfile,'Instellingen uit Profile 1 terugzetten. Daarna nog opslaan met F10.')],
+ Exit:()=>[act('Load Optimized Defaults',defDlg,'Alle instellingen terug naar fabriekswaarden. Daarna opslaan met F10. Doe dit op het einde van de les.'),act('Save Changes & Reset',saveDlg,'Wijzigingen opslaan in het CMOS en herstarten.'),act('Discard Changes & Exit',()=>{st.cur=clone(st.saved);persist();post()},'Wijzigingen niet opslaan en herstarten.'),act('Launch EFI Shell from USB drives',()=>msg('EFI Shell','Geen shellx64.efi gevonden op een USB-stick.'),'Start een opdrachtregel vóór het besturingssysteem.')],
+ 'My Favorites':()=>{const a=st.favs.map(([p,l])=>{const it=(P[p]?P[p]():[]).find(x=>x.l===l);return it}).filter(Boolean);return a.length?[hd('Selecteer een instelling en druk F4 om ze hier toe te voegen'),...a]:[info('Geen favorieten','Selecteer een item en druk F4')]}
+};
+const TABS=['My Favorites','Main','Ai Tweaker','Advanced','Monitor','Boot','Tool','Exit'];
+const PATH={Security:['Main'],Clear:['Main','Security'],CPU:['Advanced'],Storage:['Advanced'],Port1:['Advanced','Storage'],Port2:['Advanced','Storage'],Onboard:['Advanced'],APM:['Advanced'],PTT:['Advanced'],Net:['Advanced'],USB:['Advanced'],CSM:['Boot'],Secure:['Boot'],Profile:['Tool']};
+const NAMES={Security:'Security',Clear:'Paswoord vergeten?',CPU:'CPU Configuration',Storage:'PCH Storage Configuration',Port1:'SATA6G_1',Port2:'SATA6G_2',Onboard:'Onboard Devices',APM:'APM Configuration',PTT:'PCH-FW Configuration',Net:'Network Stack',USB:'USB Configuration',CSM:'CSM',Secure:'Secure Boot',Profile:'User Profile'};
+const curPage=()=>ui.stack.length?ui.stack[ui.stack.length-1]:ui.tab;
+const items=()=>P[curPage()]();
+
+let jit=0;
+function mon(){const r=n=>Math.sin(jit*1.7+n);const f=st.cur.fan,base={Silent:850,Standard:1150,Turbo:1650,'Full Speed':2350}[f]||1150;
+ const ct=Math.round((st.hw.fan?38+(f==='Silent'?3:f==='Turbo'||f==='Full Speed'?-3:0):58+jit%4)+r(1)*1.5);
+ return{ct,mt:Math.round(31+r(2)),cf:st.hw.fan?(base+Math.round(r(3)*25))+' RPM':'N/A',v:(1.012+r(4)*0.006).toFixed(3)}}
+
+/* ================= rendering ================= */
+const clock=()=>{const d=now();return d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleDateString('en-GB',{weekday:'long'})+'  '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})};
+const topbar=()=>`<div class="top"><span class="brand">UEFI BIOS Utility <span>– ${ui.adv?'Advanced Mode':'EZ Mode'}</span></span><span class="clock">${clock()}</span><span class="tk"><button data-k="F3">MyFavorite(F3)</button><button data-k="F6">Qfan(F6)</button><button data-k="F9">Search(F9)</button><button data-k="F1">Help(F1)</button></span></div>`;
+const foot=()=>`<div class="foot"><span class="vv">Version 2.20.1271 – Lab Firmware</span><button data-a="log">Last Modified</button><button data-k="F7">${ui.adv?'EzMode(F7)':'Advanced Mode(F7)'}</button><button data-k="F10">Save & Exit(F10)</button><span class="kh">${ui.adv?'↑↓ kiezen · Enter openen · Esc terug · ←→ tab · F4 favoriet':'Tab/pijltjes · F8 Boot Menu · F5 Default'}</span></div>`;
+const fsig=el=>el&&el.dataset?[el.dataset.a,el.dataset.k,el.dataset.i,el.dataset.v,el.dataset.tab].join('|'):'';
+
+function render(){
+ clearInterval(render.t);
+ const had=scr.contains(document.activeElement),sig=had?fsig(document.activeElement):'';
+ scr.innerHTML=screen();
+ if(ui.mode==='bios'){const t=scr.querySelector('.top'),b=scr.querySelector('.tabs');if(t)scr.style.setProperty('--hdr',(t.offsetHeight+(b?b.offsetHeight:0))+'px');const s=scr.querySelector('.it.sel');if(s)s.scrollIntoView({block:'nearest'});
+  render.t=setInterval(()=>{jit++;const c=scr.querySelector('.clock');if(c)c.textContent=clock();if(!ui.dlg&&((ui.adv&&ui.tab==='Monitor'&&!ui.stack.length)))render()},2000)}
+ if(had||ui.dlg||ui.mode==='pw'){
+  let el=null;
+  if(ui.mode==='pw')el=scr.querySelector('input');
+  else if(ui.dlg)el=scr.querySelector('.dlg input')||scr.querySelector('.dlg .opt.cur')||scr.querySelector('.dlg .pri')||scr.querySelector('.dlg button');
+  else if(sig){for(const b of scr.querySelectorAll('button'))if(fsig(b)===sig){el=b;break}}
+  (el||scr).focus({preventScroll:true});
+ }
+ renderKeys();renderHW();
+}
+function screen(){
+ const m=ui.mode;
+ if(m==='off')return `<div class="off"><div><p>De pc staat uit.</p><p>Druk op de <b style="color:#ccc">aan/uit-knop</b>.</p></div></div>`;
+ if(m==='post'){const logo=st.saved.logo==='Enabled';
+  return `<div class="post">${logo?`<div class="logo">LAB H310M-A</div>`:`<div>LAB Firmware POST · BIOS ${st.ver} (${VER[st.ver]})</div><div>Intel(R) Core(TM) i3-8100 CPU @ 3.60GHz</div><div id="pm">Memory test: 0 MB</div><div>SATA6G_1: ${st.saved.p1==='Enabled'?'Samsung SSD 860 EVO 250GB':'Disabled'}</div><div>SATA6G_2: ${st.saved.p2==='Enabled'?'HL-DT-ST DVDRAM GH24NSD1':'Disabled'}</div><div>USB: ${st.hw.usb==='none'?'0':'1'} Drive, 1 Keyboard, 1 Mouse</div><div>CPU Fan: ${st.hw.fan?'OK':'<span class="err">not detected</span>'}</div>`}<div class="bar" style="${logo?'position:absolute;left:32px;right:32px;bottom:58px;margin:0':''}"><i id="pbar"></i></div><div class="k">Please press <b>DEL</b> or <b>F2</b> to enter UEFI BIOS setting · <b>F8</b> boot menu${st.saved.fastboot==='Enabled'?'<br><small style="color:#9aa3b1">Fast Boot staat aan: wees snel!</small>':''}</div></div>`}
+ if(m==='posterr')return `<div class="post"><div>LAB Firmware POST · BIOS ${st.ver}</div><br>${ui.errs.map(e=>`<div class="err">${esc(e)}</div>`).join('')}${ui.errs.some(e=>/cleared|reset/i.test(e))?'':''}<br><div>Press <b style="background:#fff;color:#000;padding:0 6px">F1</b> to Run SETUP</div><p class="tip" style="margin-top:22px">${ui.errs.some(e=>/Fan/.test(e))?'CPU Fan Error: de BIOS krijgt geen toerental van de CPU-ventilator. Controleer de aansluiting op CPU_FAN. ':''}${ui.errs.some(e=>/CMOS battery/.test(e))?'CMOS-fout: de instellingen en de klok zijn verloren. Meestal is de CMOS-batterij (CR2032) leeg. ':''}${ui.errs.some(e=>/cleared/.test(e))?'Het CMOS werd gewist: alle instellingen staan op fabriekswaarden. ':''}</p></div>`;
+ if(m==='pw')return `<div class="post"><div>${ui.pwFor==='setup'?'Enter Password to enter Setup':'Enter Password'}</div><form id="pwf"><input type="password" aria-label="Paswoord" autocomplete="off"></form>${ui.pwTries?`<div class="err">Invalid Password (${ui.pwTries}/3)</div>`:''}<p class="tip" style="margin-top:22px">${ui.pwFor==='setup'?'Er is een BIOS-paswoord ingesteld.':'Er is een User Password ingesteld: het wordt bij elke start gevraagd.'} Kent niemand het? Dan moet het CMOS gewist worden.</p></div>`;
+ if(m==='halt')return `<div class="post"><div class="err">System Halted!</div><p class="tip" style="margin-top:20px">Na 3 foute paswoorden blokkeert de pc. Zet hem uit en opnieuw aan, of wis het CMOS.</p></div>`;
+ if(m==='booting')return `<div class="post">${ui.bootLines.map(l=>`<div>${l}</div>`).join('')}<div class="blink">_</div></div>`;
+ if(m==='nodev')return `<div class="post">${ui.bootLines.map(l=>`<div>${l}</div>`).join('')}<br><div>Reboot and Select proper Boot device</div><div>or Insert Boot Media in selected Boot device and press a key<span class="blink">_</span></div><p class="tip" style="margin-top:28px">De BIOS heeft alle apparaten in de bootvolgorde geprobeerd en vond niets om van op te starten. Druk op reset en kijk in de BIOS naar de bootvolgorde, CSM en de SATA-poorten.</p></div>`;
+ if(m==='bsod')return `<div class="bsod"><div class="sad">:(</div><p>Your PC ran into a problem and needs to restart. We'll restart for you.</p><p>0% complete</p><p style="font-size:14px">Stop code: INACCESSIBLE_BOOT_DEVICE</p><p class="tip">Windows kan zijn eigen opstartschijf niet meer aanspreken. Klassieke oorzaak: de SATA-modus (AHCI ↔ RST/RAID) werd gewijzigd nadat Windows geïnstalleerd was. Druk op reset, ga naar de BIOS en zet het terug.</p></div>`;
+ if(m==='setup')return `<div class="setup"><div class="w"><h2>Windows Setup</h2><p>Language to install: English (United States)</p><p><b>Install now</b></p><p style="color:#666;font-size:13px;margin-top:14px">De pc startte van de Windows-installatiestick. Dat is wat je wilt om Windows te installeren. Wil je gewoon Windows starten? Zet dan de SSD bovenaan in de bootvolgorde, of haal de stick eruit.</p></div></div>`;
+ if(m==='win')return winScreen();
+ if(m==='noram')return `<div class="post"><p>Geen beeld...</p><p style="color:#fff;font-size:20px;margin-top:30px">♪ biiiiep – biiiiep – biiiiep (lang, herhaald)</p><p class="err">POST mislukt: geen werkgeheugen gevonden.</p><p class="tip">Tijdens de POST test de BIOS de hardware. Zonder werkend RAM kan er nog geen beeld getoond worden, daarom meldt de pc de fout met pieptonen. Elke fabrikant heeft eigen piepcodes: zoek ze op in de handleiding.</p><p>Zet de pc uit, plaats het RAM terug in de pc-kast en start opnieuw.</p></div>`;
+ if(m==='brick')return `<div class="post"><p class="err">Stroom onderbroken tijdens het schrijven van de BIOS-chip.</p><p>De pc toont geen beeld meer en start niet op. De BIOS is corrupt ("bricked").</p><p class="tip" style="margin-top:20px">Wat nu in het echt?<br>– Sommige moederborden hebben BIOS FlashBack of een tweede (dual) BIOS-chip.<br>– Anders: de BIOS-chip laten herprogrammeren of vervangen, of het moederbord vervangen.<br>– Daarom: nooit uitschakelen tijdens het flashen, laptop aan de lader, liefst een UPS.</p><p>Druk op de reset-knop om de oefening te herstellen.</p></div>`;
+ if(m==='flash')return flashHTML();
+ if(m==='qfan')return qfanHTML();
+ if(m==='bios'){if(ui.adv)flag('sawAdv');else flag('sawEZ');return topbar()+(ui.adv?advHTML():ezHTML())+foot()+(ui.dlg?`<div class="ov">${ui.dlg}</div>`:'')}
+ return '';
+}
+function winScreen(){const s=st.saved,y='<span class="yes">',n='<span class="no">',e='</span>';const sec=secOn(s),tpm=s.ptt==='Enabled';
+ const w11=sec&&tpm;
+ return `<div class="win"><h2>Windows is opgestart</h2><p>${ui.winMsg||'Herstart met de reset-knop en druk op DEL of F2 om de BIOS te openen.'}</p>
+ <div class="sys"><h3>Systeeminformatie (msinfo32)</h3><dl>
+ <dt>BIOS-versie/-datum</dt><dd>LAB Firmware ${st.ver}, ${VER[st.ver]}</dd>
+ <dt>BIOS-modus</dt><dd>UEFI</dd>
+ <dt>Status van beveiligd opstarten</dt><dd>${sec?y+'Aan':n+'Uit'}${e}</dd>
+ <dt>TPM 2.0</dt><dd>${tpm?y+'Gereed':n+'Niet gevonden'}${e}</dd>
+ <dt>Virtualisatie ingeschakeld in firmware</dt><dd>${s.vtx==='Enabled'?y+'Ja':n+'Nee'}${e}</dd>
+ <dt>Geïnstalleerd geheugen (RAM)</dt><dd>8,00 GB</dd>
+ <dt>Netwerk</dt><dd>${s.lan==='Enabled'?y+'Ethernet: verbonden':n+'Geen netwerkadapter gevonden'}${e}</dd>
+ <dt>Geluid</dt><dd>${s.hdaudio==='Enabled'?y+'Realtek High Definition Audio':n+'Geen audio-uitvoerapparaat'}${e}</dd>
+ <dt>Datum en tijd</dt><dd>${Math.abs(st.timeOff)>36e5*36?n:y}${now().toLocaleString('nl-BE')}${e}</dd>
+ <dt>Geschikt voor Windows 11</dt><dd>${w11?y+'Ja':n+'Nee ('+[!tpm&&'TPM 2.0',!sec&&'Secure Boot'].filter(Boolean).join(', ')+')'}${e}</dd>
+ </dl></div></div>`}
+function ezHTML(){const m=mon(),c=st.cur,pr=present(c);
+ return `<div class="ez">
+ <div class="pan"><h3>Information</h3><p>LAB H310M-A · BIOS Ver. ${st.ver}</p><p>Intel(R) Core(TM) i3-8100 CPU @ 3.60GHz</p><p>Speed: 3600 MHz</p><p>Memory: 8192 MB (DDR4 2400MHz)</p><p>Build date: ${VER[st.ver]}</p></div>
+ <div class="pan"><h3>CPU Temperature</h3><div class="big">${m.ct} °C</div><p>CPU Core Voltage ${m.v} V</p><p>Motherboard Temperature ${m.mt} °C</p></div>
+ <div class="pan"><h3>DRAM Status</h3><p>DIMM_A1: Kingston 8192 MB 2400 MHz</p><p>DIMM_B1: N/A</p><h3 style="margin-top:8px">X.M.P.</h3><div class="ezb">${['Disabled','XMP I'].map(x=>`<button data-a="ezset" data-i="xmp" data-v="${x}" class="${c.xmp===x?'on':''}">${x}</button>`).join('')}</div></div>
+ <div class="pan"><h3>SATA Information</h3><p>SATA6G_1: ${c.p1==='Enabled'?'Samsung SSD 860 EVO 250GB':'N/A'}</p><p>SATA6G_2: ${c.p2==='Enabled'?'HL-DT-ST DVDRAM GH24NSD1':'N/A'}</p><p>SATA6G_3: N/A · SATA6G_4: N/A</p><p>M.2_1: N/A</p></div>
+ <div class="pan"><h3>CPU FAN</h3><div class="big ${st.hw.fan?'':'bad'}">${m.cf}</div><p>Profiel: ${c.fan}</p><div class="ezb"><button data-k="F6">QFan Control (F6)</button></div></div>
+ <div class="pan"><h3>Intel Rapid Storage Technology</h3><p>Huidig: ${c.sata==='AHCI'?'Off (AHCI)':'On (RST)'}</p><div class="ezb">${[['On','Intel RST Premium'],['Off','AHCI']].map(([l,v])=>`<button data-a="ezset" data-i="sata" data-v="${v}" class="${c.sata===v?'on':''}">${l}</button>`).join('')}</div></div>
+ <div class="pan span2"><h3>Boot Priority</h3><p>Bovenaan = eerst. Verplaats met de pijltjes.</p>${pr.length?pr.map((id,i)=>`<div class="bo"><span>${i+1}. ${esc(devName(id))}</span><button data-a="up" data-i="${i}" aria-label="Omhoog">↑</button><button data-a="down" data-i="${i}" aria-label="Omlaag">↓</button></div>`).join(''):'<p style="color:#ff7b72">Geen opstartapparaten gevonden.</p>'}</div>
+ <div class="pan"><h3>EZ System Tuning</h3><div class="ezb">${['Power Saving','Normal'].map(x=>`<button data-a="ezset" data-i="ezTune" data-v="${x}" class="${c.ezTune===x?'on':''}">${x}</button>`).join('')}</div><h3 style="margin-top:10px">Secure Boot</h3><p>Status: ${secOn(c)?'Enabled':'Disabled'}</p><div class="ezb"><button data-k="F8">Boot Menu (F8)</button><button data-k="F5">Default (F5)</button></div></div>
+ </div>`}
+function advHTML(){
+ const its=items();if(ui.sel>=its.length)ui.sel=0;if(its[ui.sel]&&its[ui.sel].ty==='hd'){const j=its.findIndex(x=>x.ty!=='hd');ui.sel=j<0?0:j}
+ const cur=its[ui.sel]||{};const fav=(p,l)=>st.favs.some(f=>f[0]===p&&f[1]===l);const pg=curPage();
+ const crumb=ui.stack.length?`<div class="crumb"><button data-a="back">← ${esc(ui.tab)}</button> \\ ${ui.stack.map(s=>esc(NAMES[s]||s)).join(' \\ ')}</div>`:'';
+ const row=(it,i)=>{const s=i===ui.sel?' sel':'';const star=it.ty==='sel'&&fav(pageOf(it),it.l)?'<span class="star">★</span>':'';
+  if(it.ty==='hd')return `<div class="it hd">${esc(it.l)}</div>`;
+  if(it.ty==='info')return `<div class="it info${s}" data-row="${i}"><span class="l">${esc(it.l)}</span><span class="v">${esc(it.v)}</span></div>`;
+  if(it.ty==='sel'){const ch=st.cur[it.k]!==st.saved[it.k];return `<div class="it${s}" data-row="${i}"><span class="l">${esc(it.l)}${star}</span><span class="v box${ch?' chg':''}">${esc(st.cur[it.k])}</span></div>`}
+  if(it.ty==='bootp'){const ch=JSON.stringify(present(st.cur))!==JSON.stringify(present(st.saved));return `<div class="it${s}" data-row="${i}"><span class="l">${esc(it.l)}</span><span class="v box${ch?' chg':''}">${esc(it.v)}</span></div>`}
+  return `<div class="it${it.ty==='sub'?' sub':''}${s}" data-row="${i}"><span class="l">${esc(it.l)}</span><span></span></div>`};
+ const m=mon();
+ return `<div class="tabs">${TABS.map(t=>`<button data-tab="${t}" class="${t===ui.tab?'on':''}">${t}</button>`).join('')}</div>
+ <div class="body"><div class="list">${crumb}${its.map(row).join('')}</div>
+ <div class="side"><h4>Uitleg</h4><div class="help">${esc(cur.h||'Selecteer een item om uitleg te zien.')}</div>
+ <h4>Hardware Monitor</h4><div class="hm"><div><small>CPU Freq</small>3600 MHz</div><div><small>Temperature</small>${m.ct} °C</div><div><small>Core Voltage</small>${m.v} V</div><div><small>CPU Fan</small>${m.cf}</div><div><small>DRAM</small>8192 MB</div><div><small>+12V</small>12.096 V</div></div></div></div>`}
+// waar komt een item vandaan (voor favorieten)
+function pageOf(it){if(ui.tab!=='My Favorites'||ui.stack.length)return curPage();const f=st.favs.find(f=>f[1]===it.l);return f?f[0]:curPage()}
+
+/* ================= toetsenstrook & pc-kast ================= */
+function renderKeys(){
+ const pw=ui.mode!=='off';
+ $('#keys').innerHTML=`<button class="kb pw ${pw?'on':''}" data-pk="power">⏻ Aan/uit</button><button class="kb pw" data-pk="reset">Reset</button>`+['Delete','F1','F2','F5','F7','F8','F9','F10','F12','Escape'].map(k=>`<button class="kb" data-pk="${k}">${k==='Delete'?'DEL':k==='Escape'?'Esc':k}</button>`).join('');
+}
+function renderHW(){const h=st.hw,off=ui.mode==='off';
+ const b=(k,lab,good,txt)=>`<button class="hwb ${good?'good':'bad'}" data-hw="${k}" ${off?'':'aria-disabled="true"'}><small>${lab}</small><b>${txt}</b></button>`;
+ $('#hw').innerHTML=b('ram','Werkgeheugen (DIMM_A1)',h.ram,h.ram?'Geplaatst':'Verwijderd')+b('fan','CPU-ventilator (CPU_FAN)',h.fan,h.fan?'Aangesloten':'Losgekoppeld')+b('bat','CMOS-batterij (CR2032)',h.bat,h.bat?'Goed':'Leeg')+
+ `<button class="hwb" data-hw="clrtc"><small>CLRTC-jumper</small><b>Overbruggen (CMOS wissen)</b></button>`+
+ `<label class="hwb"><small>USB-stick</small><select id="usbsel"><option value="none">Geen stick</option><option value="data">Datastick met BIOS-bestanden</option><option value="install">Windows-installatiestick</option></select></label>`;
+ $('#usbsel').value=h.usb;
+}
+const hwNote=t=>{const n=$('#hwnote');n.textContent=t;clearTimeout(hwNote.t);hwNote.t=setTimeout(()=>n.textContent='',4000)};
+$('#hw').addEventListener('click',e=>{const b=e.target.closest('[data-hw]');if(!b)return;const k=b.dataset.hw;
+ if(ui.mode!=='off'){hwNote('Zet de pc eerst uit met de aan/uit-knop. Nooit hardware wijzigen terwijl de pc aan staat!');return}
+ if(k==='clrtc'){st.adminPw='';st.userPw='';st.saved=clone(DEF);st.cur=clone(DEF);st.timeOff=new Date(2018,0,1).getTime()-Date.now();st.pend=['CMOS settings cleared. BIOS settings were reset to default.','Please enter setup to recover BIOS setting.'];persist();hwNote('CMOS gewist: paswoorden, instellingen, datum en tijd zijn gereset.');renderAside();return}
+ st.hw[k]=!st.hw[k];persist();renderHW();renderAside();
+});
+$('#hw').addEventListener('change',e=>{if(e.target.id!=='usbsel')return;st.hw.usb=e.target.value;persist();if(ui.mode==='bios')render();else if(ui.mode==='flash')render();renderAside()});
+$('#keys').addEventListener('click',e=>{const b=e.target.closest('[data-pk]');if(!b)return;const k=b.dataset.pk;scr.focus({preventScroll:true});
+ if(k==='power')return powerBtn();if(k==='reset')return resetBtn();key(k)});
+
+/* ================= aan/uit, POST, opstarten ================= */
+const stop=()=>{clearInterval(ui.timer);clearTimeout(ui.timer)};
+function powerBtn(){
+ if(ui.mode==='flash'&&ui.flash.stage==='run'){stop();ui.mode='brick';return render()}
+ if(ui.mode==='off'){
+  if(!st.hw.bat){st.saved=clone(DEF);st.cur=clone(DEF);st.adminPw='';st.userPw='';st.timeOff=new Date(2018,0,1).getTime()-Date.now();st.pend=['The CMOS battery has failed.','CMOS Date/Time Not Set.'];persist()}
+  return post()}
+ stop();ui.mode='off';ui.dlg=null;render()}
+function resetBtn(){if(ui.mode==='off')return;if(ui.mode==='flash'&&ui.flash.stage==='run'){stop();ui.mode='brick';return render()}post()}
+function post(){
+ stop();ui.dlg=null;ui.stack=[];ui.sel=0;ui.override=null;ui.winMsg=ui.nextMsg||'';ui.nextMsg='';
+ if(!st.hw.ram){ui.mode='noram';render();beep();return}
+ ui.mode='post';render();
+ const dur=st.saved.fastboot==='Enabled'?2600:4200;let t=0;
+ ui.timer=setInterval(()=>{t+=100;const b=$('#pbar'),pm=$('#pm');if(b)b.style.width=(t/dur*100)+'%';if(pm)pm.textContent='Memory test: '+Math.min(8192,Math.round(t/dur*1.6*8192))+' MB '+(t/dur>.6?'OK':'');
+  if(t>=dur){stop();postDone()}},100);
+}
+function postErrs(){const e=[...(st.pend||[])];if(!st.hw.fan)e.push('CPU Fan Error!');return e}
+function postDone(){const e=postErrs();
+ if(e.length){if(st.saved.waitf1==='Enabled'||(st.pend||[]).length){ui.mode='posterr';ui.errs=e;return render()}}
+ afterPost()}
+function afterPost(){st.pend=[];persist();if(st.userPw){ui.mode='pw';ui.pwFor='boot';ui.pwTries=0;return render()}bootNow()}
+function enterSetup(){stop();st.pend=[];persist();if(st.adminPw||st.userPw){ui.mode='pw';ui.pwFor='setup';ui.pwTries=0;return render()}openBios('Administrator')}
+function openBios(acc){ui.mode='bios';ui.adv=false;ui.access=acc;ui.dlg=null;ui.stack=[];ui.tab='Main';ui.sel=0;flag('entered');render()}
+function pwSubmit(v){
+ const okA=st.adminPw&&v===st.adminPw,okU=st.userPw&&v===st.userPw;
+ if(okA||okU){if(ui.pwFor==='setup')return openBios(okA||!st.adminPw?'Administrator':'User');return bootNow()}
+ ui.pwTries++;if(ui.pwTries>=3){ui.mode='halt';return render()}render()}
+function outcome(s,first){
+ const order=present(s);if(first&&order.includes(first)){order.splice(order.indexOf(first),1);order.unshift(first)}
+ const legacyOnly=s.csm==='Enabled'&&s.csmstor==='Legacy only',ign=s.csm==='Enabled'&&s.csmstor==='Ignore';const L=[];
+ for(const id of order){
+  if(id==='ssd'){if(legacyOnly||ign){L.push(['SATA6G_1: geen legacy-bootsector gevonden (Windows staat op een GPT/UEFI-schijf)',700]);continue}if(s.sata!=='AHCI')return{L:[...L,['Windows Boot Manager laden...',600]],end:'bsod'};return{L:[...L,['Windows Boot Manager laden...',500]],end:'win'}}
+  if(id==='dvd'){L.push(['SATA6G_2: geen schijf in het DVD-station',700]);continue}
+  if(id==='usb'){if(st.hw.usb==='install')return{L:[...L,['USB: Windows Setup laden...',600]],end:'setup'};L.push(['USB: geen opstartbaar besturingssysteem op de stick',700]);continue}
+  if(id==='pxe'){L.push(['>>Start PXE over IPv4.',1600],['PXE-E16: No offer received.',1400]);continue}
+ }
+ return{L,end:'nodev'}}
+function bootNow(){
+ stop();ui.dlg=null;const o=outcome(st.saved,ui.override);const ov=ui.override;ui.override=null;
+ ui.mode='booting';ui.bootLines=[];render();let i=0;
+ const step=()=>{if(i>=o.L.length){ui.mode=o.end;if(o.end==='win'&&ov&&!ui.winMsg)ui.winMsg='Eenmalig opgestart via het bootmenu. De volgende keer gebruikt de pc weer de gewone bootvolgorde.';render();return}
+  ui.bootLines.push(esc(o.L[i][0]));render();ui.timer=setTimeout(step,o.L[i][1]);i++};
+ ui.timer=setTimeout(step,300)}
+let actx;function beep(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();const t=actx.currentTime;for(let i=0;i<3;i++){const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=880;g.gain.value=.05;o.connect(g);g.connect(actx.destination);o.start(t+i*.9);o.stop(t+i*.9+.6)}}catch(e){}}
+
+/* ================= dialogen & acties ================= */
+const dlg=h=>{ui.dlg=`<div class="dlg" role="dialog">${h}</div>`;render()};
+const msg=(t,h)=>dlg(`<h3>${t}</h3><p>${h}</p><div class="acts"><button class="pri" data-a="close">OK</button></div>`);
+const userBlock=()=>{if(ui.access==='User'){msg('Access Level: User','Je bent binnengekomen met het User Password. Daarmee kun je deze instelling niet wijzigen.');return true}return false};
+function pwDlg(k){flag('sawSecurity');if(userBlock())return;dlg(`<h3>${k==='adminPw'?'Administrator':'User'} Password</h3><p class="warn">In de klas en op je VM stel je GEEN paswoord in. Ben je het kwijt, dan moet het CMOS gewist worden.</p><p>In de simulator mag je het proberen. Laat beide velden leeg om het paswoord te verwijderen.</p><label>Create New Password<input id="pw1" type="password" autocomplete="off"></label><label>Confirm New Password<input id="pw2" type="password" autocomplete="off"></label><div class="acts"><button data-a="close">Cancel</button><button class="pri" data-a="setpw" data-v="${k}">OK</button></div>`)}
+function dateDlg(){if(userBlock())return;const d=now(),p=n=>String(n).padStart(2,'0');dlg(`<h3>System Date / Time</h3><p>Deze klok draait op de CMOS-batterij, ook als de pc uit staat.</p><label>Datum<input id="dd" type="date" value="${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}"></label><label>Tijd<input id="tt" type="time" value="${p(d.getHours())}:${p(d.getMinutes())}"></label><div class="acts"><button data-a="realtime">Huidige tijd</button><button data-a="close">Cancel</button><button class="pri" data-a="setdate">OK</button></div>`)}
+function defDlg(){if(userBlock())return;dlg(`<h3>Load Optimized Defaults?</h3><p>Alle instellingen gaan terug naar de fabriekswaarden. Opslaan doe je daarna met F10.</p><div class="acts"><button data-a="close">Cancel</button><button class="pri" data-a="dodef">Ok</button></div>`)}
+function loadProfile(){if(userBlock())return;if(!st.profile)return msg('Profile 1','Profile 1 is leeg. Sla eerst een profiel op.');
+ st.cur=clone(st.profile.s);if(st.profile.ver!==st.ver)flag('profileLoaded');persist();msg('Profiel geladen','Instellingen uit Profile 1 (BIOS '+st.profile.ver+') teruggezet. Controleer ze en sla op met F10.')}
+function diff(){const r=[];for(const k in LBL)if(st.cur[k]!==st.saved[k])r.push([LBL[k],st.saved[k],st.cur[k]]);const a=present(st.cur).map(devName).join(' › '),b=present(st.saved).map(devName).join(' › ');if(JSON.stringify(st.cur.boot)!==JSON.stringify(st.saved.boot))r.push(['Boot Option Priorities',b,a]);return r}
+function saveDlg(){const d=diff();dlg(`<h3>Save & reset</h3><p>Save configuration and reset?</p>${d.length?`<table><tr><th>Instelling</th><th>Nieuw</th></tr>${d.map(r=>`<tr><td>${esc(r[0])}</td><td class="n">${esc(r[2])}</td></tr>`).join('')}</table>`:'<p>(Geen wijzigingen)</p>'}<div class="acts"><button data-a="close">Cancel</button><button class="pri" data-a="dosave">Ok</button></div>`)}
+function exitDlg(){dlg(`<h3>Exit</h3><p>Wat wil je doen?</p><button class="opt" data-a="dosave">Save Changes & Reset</button><button class="opt" data-a="discard">Discard Changes & Exit</button><button class="opt cur" data-a="close">Cancel</button>`)}
+function helpDlg(){dlg(`<h3>General Help</h3><table>${[['↑ ↓','Item kiezen'],['← →','Tabblad wisselen'],['Enter','Openen / wijzigen'],['Esc','Terug / afsluiten'],['F1','Help'],['F3','My Favorites'],['F4','Item toevoegen aan favorieten'],['F5','Optimized Defaults'],['F6','Q-Fan Control'],['F7','EZ / Advanced Mode'],['F8','Boot Menu'],['F9','Zoeken'],['F10','Save & Exit'],['F12','Screenshot naar USB']].map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table><div class="acts"><button class="pri" data-a="close">OK</button></div>`)}
+function logDlg(){dlg(`<h3>Last Modified Log</h3>${st.log.length?`<table><tr><th>Tijd</th><th>Instelling</th><th>Oud → nieuw</th></tr>${st.log.slice(0,20).map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td class="n">${esc(r[2])} → ${esc(r[3])}</td></tr>`).join('')}</table>`:'<p>Nog geen opgeslagen wijzigingen.</p>'}<p>Handig als iemand "niets veranderd heeft" en de pc toch raar doet.</p><div class="acts"><button class="pri" data-a="close">OK</button></div>`)}
+function searchDlg(q=''){const res=[];if(q.length>=2){for(const p in P){if(p==='My Favorites')continue;P[p]().forEach((it,i)=>{if(it.ty!=='hd'&&it.l.toLowerCase().includes(q.toLowerCase()))res.push([p,i,it.l])})}}
+ dlg(`<h3>Search</h3><input id="sq" value="${esc(q)}" placeholder="bv. virtual, secure, sata" autocomplete="off">${res.slice(0,8).map(r=>`<button class="opt" data-a="goto" data-v="${esc(r[0])}" data-i="${r[1]}">${esc(r[2])} <small style="color:#7d8695">– ${esc(r[0]==='Main'||TABS.includes(r[0])?r[0]:(PATH[r[0]]||[]).join(' › ')+' › '+(NAMES[r[0]]||r[0]))}</small></button>`).join('')}${q.length>=2&&!res.length?'<p>Niets gevonden.</p>':''}<div class="acts"><button data-a="close">Esc</button></div>`);
+ const i=$('#sq');if(i){i.focus();i.setSelectionRange(q.length,q.length)}}
+function bootMenu(){const pr=present(st.saved);dlg(`<h3>Please select boot device:</h3>${pr.map(id=>`<button class="opt" data-a="bootonce" data-v="${id}">${esc(devName(id))}</button>`).join('')}<button class="opt" data-a="${ui.mode==='bios'?'close':'entersetup'}">Enter Setup</button><p>↑ en ↓ om te kiezen, Enter om te starten. Dit wijzigt de bootvolgorde niet.</p>`)}
+function choose(it){
+ if(!it)return;
+ if(it.ty==='sel'){if(userBlock())return;dlg(`<h3>${esc(it.l)}</h3>${it.o.map(o=>`<button class="opt ${o===st.cur[it.k]?'cur':''}" data-a="pick" data-i="${it.k}" data-v="${esc(o)}">${esc(o)}</button>`).join('')}<div class="acts"><button data-a="close">Esc</button></div>`)}
+ else if(it.ty==='bootp'){if(userBlock())return;const pr=present(st.cur);dlg(`<h3>${esc(it.l)}</h3>${pr.map(o=>`<button class="opt ${o===pr[it.i]?'cur':''}" data-a="bootpick" data-i="${it.i}" data-v="${o}">${esc(devName(o))}</button>`).join('')}<div class="acts"><button data-a="close">Esc</button></div>`)}
+ else if(it.ty==='sub'){if(it.flg)flag(it.flg);if(it.p==='Security')flag('sawSecurity');ui.stack.push(it.p);ui.sel=0;render()}
+ else if(it.ty==='act')it.fn()}
+function moveBoot(i,j){const pr=present(st.cur);if(j<0||j>=pr.length)return;[pr[i],pr[j]]=[pr[j],pr[i]];st.cur.boot=[...pr,...st.cur.boot.filter(x=>!pr.includes(x))];persist();render()}
+function doSave(){const d=diff(),t=now().toLocaleString('en-GB');d.forEach(r=>st.log.unshift([t,r[0],r[1],r[2]]));st.log=st.log.slice(0,30);
+ st.saved=clone(st.cur);if(view==='oefen'&&F.defaultsPending&&sameDef(st.saved)){F.defaultsAfter=true}persist();renderAside();ui.nextMsg=d.length?'De instellingen zijn opgeslagen in het CMOS en de pc is opnieuw opgestart.':'';post()}
+function A(a,d){
+ if(a==='close'){ui.dlg=null;return render()}
+ if(a==='dosave')return doSave();
+ if(a==='discard'){st.cur=clone(st.saved);persist();return post()}
+ if(a==='dodef'){st.cur=clone(DEF);if(view==='oefen'&&F.profileLoaded)F.defaultsPending=true;ui.dlg=null;persist();return render()}
+ if(a==='pick'){st.cur[d.i]=d.v;ui.dlg=null;persist();return render()}
+ if(a==='bootpick'){const pr=present(st.cur);const i=+d.i,o=pr.indexOf(d.v);ui.dlg=null;return moveBoot(i,o)}
+ if(a==='up')return moveBoot(+d.i,+d.i-1);if(a==='down')return moveBoot(+d.i,+d.i+1);
+ if(a==='ezset'){if(userBlock())return;st.cur[d.i]=d.v;persist();return render()}
+ if(a==='bootonce'){ui.override=d.v;ui.dlg=null;return bootNow()}
+ if(a==='entersetup'){ui.dlg=null;return enterSetup()}
+ if(a==='setpw'){const v1=$('#pw1').value,v2=$('#pw2').value;if(v1!==v2)return msg('Error','Passwords do not match.');st[d.v]=v1;persist();if(!v1)return msg('Paswoord verwijderd','Het paswoord is gewist.');return msg('Paswoord ingesteld',(d.v==='userPw'?'Het User Password wordt nu bij elke start gevraagd.':'Het Administrator Password wordt gevraagd bij het openen van de BIOS.')+' Vergeten? Dan moet het CMOS gewist worden (CLRTC-jumper in de pc-kast).')}
+ if(a==='setdate'){const dd=$('#dd').value,tt=$('#tt').value;if(dd){const nd=new Date(dd+'T'+(tt||'00:00'));if(!isNaN(nd))st.timeOff=nd.getTime()-Date.now()}persist();ui.dlg=null;return render()}
+ if(a==='realtime'){st.timeOff=0;persist();ui.dlg=null;return render()}
+ if(a==='back'){ui.stack.pop();ui.sel=0;return render()}
+ if(a==='log')return logDlg();
+ if(a==='goto'){const p=d.v,path=PATH[p];ui.dlg=null;ui.adv=true;if(path){ui.tab=path[0];ui.stack=[...path.slice(1),p]}else{ui.tab=p;ui.stack=[]}ui.sel=+d.i;if(p==='Secure')flag('sawSecure');if(p==='Security')flag('sawSecurity');if(p==='Clear')flag('sawClear');return render()}
+ if(a&&a.startsWith('f'))return flashA(a,d);
+ if(a&&a.startsWith('q'))return qfanA(a,d);
+}
+
+/* ================= toetsen ================= */
+function key(k,ev){
+ const m=ui.mode;
+ if(m==='post'){if(k==='Delete'||k==='F2'){stop();enterSetup()}else if(k==='F8'){stop();ui.mode='bios';ui.adv=false;ui.access='Administrator';bootMenuFromPost()}return true}
+ if(m==='posterr'){if(k==='F1'||k==='Delete'||k==='F2')enterSetup();return true}
+ if(m==='nodev'){if(k.length===1||k==='Enter'||k===' ')post();return true}
+ if(m==='flash'){if(k==='Escape'){if(ui.dlg){ui.dlg=null;render()}else if(ui.flash.stage==='pick'){ui.mode='bios';ui.adv=true;render()}}return true}
+ if(m==='qfan'){if(k==='Escape'){ui.mode='bios';render()}return true}
+ if(m!=='bios')return false;
+ if(ui.dlg){
+  const tgt=ev&&ev.target;const inInput=tgt&&tgt.tagName==='INPUT';
+  if(k==='Escape'){ui.dlg=null;render();return true}
+  if((k==='ArrowDown'||k==='ArrowUp')&&!(inInput&&tgt.type!=='text'&&tgt.id!=='sq')){const bs=[...scr.querySelectorAll('.dlg button')];let i=bs.indexOf(document.activeElement);i=k==='ArrowDown'?Math.min(bs.length-1,i+1):Math.max(0,i-1);if(bs[i])bs[i].focus();return true}
+  if(k==='Enter'&&inInput){const b=scr.querySelector('.dlg .pri')||scr.querySelector('.dlg .opt');if(b)b.click();return true}
+  return false}
+ if(k==='F1'){helpDlg();return true}
+ if(k==='F3'){ui.adv=true;ui.tab='My Favorites';ui.stack=[];ui.sel=0;render();return true}
+ if(k==='F4'){if(!ui.adv)return true;const it=items()[ui.sel];if(it&&it.ty==='sel'){const p=pageOf(it);const i=st.favs.findIndex(f=>f[0]===p&&f[1]===it.l);if(i>=0)st.favs.splice(i,1);else st.favs.push([p,it.l]);persist();render()}return true}
+ if(k==='F5'){defDlg();return true}
+ if(k==='F6'){openQfan();return true}
+ if(k==='F7'){ui.adv=!ui.adv;render();return true}
+ if(k==='F8'){bootMenu();return true}
+ if(k==='F9'){searchDlg();return true}
+ if(k==='F10'){saveDlg();return true}
+ if(k==='F12'){if(st.hw.usb==='none')msg('Screenshot','Geen USB-stick gevonden om de screenshot op te slaan.');else{ui.shots++;msg('Screenshot','Opgeslagen als fs0:\\LAB'+String(ui.shots).padStart(4,'0')+'.BMP op de USB-stick.<br><br>Voor je opdracht: neem de screenshot met Win+Shift+S op je eigen pc.')}return true}
+ if(k==='Escape'){if(ui.adv&&ui.stack.length){ui.stack.pop();ui.sel=0;render()}else exitDlg();return true}
+ if(!ui.adv){
+  if(k.startsWith('Arrow')){const bs=[...scr.querySelectorAll('.ez button')];let i=bs.indexOf(document.activeElement);i=(k==='ArrowDown'||k==='ArrowRight')?Math.min(bs.length-1,i+1):Math.max(0,i-1);if(bs[i])bs[i].focus();return true}
+  return false}
+ const its=items(),ok=i=>its[i]&&its[i].ty!=='hd';
+ if(k==='ArrowDown'){let i=ui.sel+1;while(i<its.length&&!ok(i))i++;if(i<its.length)ui.sel=i;render();return true}
+ if(k==='ArrowUp'){let i=ui.sel-1;while(i>=0&&!ok(i))i--;if(i>=0)ui.sel=i;render();return true}
+ if(k==='ArrowRight'||k==='ArrowLeft'){if(ui.stack.length)return true;const n=TABS.indexOf(ui.tab)+(k==='ArrowRight'?1:-1);ui.tab=TABS[(n+TABS.length)%TABS.length];ui.sel=0;render();return true}
+ if(k==='Enter'){if(document.activeElement!==scr&&document.activeElement.tagName==='BUTTON')return false;choose(its[ui.sel]);return true}
+ return false}
+function bootMenuFromPost(){const pr=present(st.saved);ui.dlg=`<div class="dlg" role="dialog"><h3>Please select boot device:</h3>${pr.map(id=>`<button class="opt" data-a="bootonce" data-v="${id}">${esc(devName(id))}</button>`).join('')}<button class="opt" data-a="entersetup">Enter Setup</button><p>↑ en ↓ om te kiezen, Enter om te starten.</p></div>`;
+ scr.innerHTML=`<div class="post"></div><div class="ov">${ui.dlg}</div>`;ui.mode='bootmenu';const b=scr.querySelector('.opt');if(b)b.focus()}
+scr.addEventListener('keydown',e=>{
+ let k=e.key;if(k==='Del')k='Delete';
+ if(ui.mode==='bootmenu'){if(k==='ArrowDown'||k==='ArrowUp'){e.preventDefault();const bs=[...scr.querySelectorAll('.dlg button')];let i=bs.indexOf(document.activeElement);i=k==='ArrowDown'?Math.min(bs.length-1,i+1):Math.max(0,i-1);bs[i]&&bs[i].focus()}return}
+ if(ui.mode==='pw')return;
+ const inp=e.target.tagName==='INPUT';
+ const special=inp?/^(F\d+)/.test(k):/^(F\d+|Arrow|Escape|Delete)/.test(k);
+ if(inp&&(k==='Delete'||k==='ArrowLeft'||k==='ArrowRight'||k==='Backspace'))return;
+ if(key(k,e)&&(special||k==='Enter'))e.preventDefault();
+ else if(special)e.preventDefault();
+});
+scr.addEventListener('input',e=>{if(e.target.id==='sq'){const v=e.target.value;searchDlg(v)}});
+scr.addEventListener('submit',e=>{e.preventDefault();if(e.target.id==='pwf')pwSubmit(e.target.querySelector('input').value)});
+scr.addEventListener('click',e=>{
+ const t=e.target.closest('[data-a],[data-k],[data-tab],[data-row]');
+ if(!t){if(!scr.contains(document.activeElement))scr.focus({preventScroll:true});if(ui.mode==='nodev')post();return}
+ if(t.dataset.k){key(t.dataset.k);return}
+ if(t.dataset.tab||t.dataset.row!=null)scr.focus({preventScroll:true});
+ if(t.dataset.tab){ui.tab=t.dataset.tab;ui.stack=[];ui.sel=0;render();return}
+ if(t.dataset.a){if(ui.mode==='bootmenu')ui.mode='bios';return A(t.dataset.a,t.dataset)}
+ if(t.dataset.row!=null){const i=+t.dataset.row;ui.sel=i;const it=items()[i];if(it&&it.ty!=='info')choose(it);else render()}
+});
+
+/* ================= EZ Flash ================= */
+const FILES={data:[{n:'LABH310M-A-1203.CAP',m:'LAB H310M-A',v:'1203',sz:'16 MB'},{n:'LABH310M-A-1401.CAP',m:'LAB H310M-A',v:'1401',sz:'16 MB'},{n:'B450-PLUS-0805.CAP',m:'B450-PLUS',v:'0805',sz:'16 MB'},{n:'LEESMIJ.TXT',m:'',v:'',sz:'2 KB'}],install:[{n:'boot',dir:1},{n:'efi',dir:1},{n:'sources',dir:1},{n:'setup.exe',m:'',v:'',sz:'94 KB'}]};
+function openFlash(){if(userBlock())return;ui.dlg=null;ui.mode='flash';ui.flash={f:null,stage:'pick',p:0,msg:''};render()}
+function flashHTML(){const f=ui.flash,list=FILES[st.hw.usb]||[],sf=f.f!=null?list[f.f]:null;
+ return `<div class="fl"><h2>EZ Flash 3 Utility v03.00</h2>
+ <div class="info"><span>Model</span><b>LAB H310M-A</b><span>Version</span><b>${st.ver}</b><span>Date</span><b>${VER[st.ver]}</b>${sf&&sf.m?`<span>File model</span><b>${sf.m}</b><span>File version</span><b>${sf.v}</b>`:''}</div>
+ <div class="flg"><div class="box"><div style="color:#7d8695;font-size:12px">Drives</div>${st.hw.usb==='none'?'<div class="row" style="color:#ff8a80">No USB drive found</div>':'<div class="row on">fs0:\\ SanDisk USB</div>'}</div>
+ <div class="box"><div style="color:#7d8695;font-size:12px">Folder: fs0:\\</div>${list.map((x,i)=>`<button class="row ${f.f===i?'on':''}" data-a="fpick" data-i="${i}"><span>${x.dir?'['+x.n+']':x.n}</span><span>${x.dir?'&lt;DIR&gt;':x.sz}</span></button>`).join('')}${st.hw.usb==='none'?'<p style="color:#9aa3b1;font-size:13px">Steek de datastick in de pc (pc-kast hieronder).</p>':''}</div></div>
+ ${f.stage==='run'?`<p style="margin-top:12px;color:#ffd166">${f.msg}</p><div class="prog"><i style="width:${f.p}%"></i></div><p style="color:#ff8a80">Zet de computer NIET uit en druk niet op reset!</p><button class="kb pw" data-a="fcut" style="border-color:#7a2a25;color:#ffb3ad">Simuleer stroompanne</button>`:''}
+ ${f.stage==='done'?`<p style="margin-top:12px;color:#3fcf86">Update geslaagd. De BIOS-instellingen zijn teruggezet naar fabriekswaarden. Druk op OK om te herstarten.</p><button class="kb pw" data-a="fdone">OK</button>`:''}
+ ${f.stage==='pick'?`<p style="margin-top:10px;color:#9aa3b1;font:13px 'IBM Plex Sans',sans-serif">Klik op een .CAP-bestand. Esc = terug naar de BIOS.</p>`:''}
+ ${ui.dlg?`<div class="ov">${ui.dlg}</div>`:''}</div>`}
+function flashA(a,d){const list=FILES[st.hw.usb]||[];
+ if(a==='fpick'){const x=list[+d.i];ui.flash.f=+d.i;
+  if(x.dir)return dlg(`<h3>[${x.n}]</h3><p>Geen BIOS-bestanden in deze map. Dit is een Windows-installatiestick, geen stick met de BIOS-update.</p><div class="acts"><button class="pri" data-a="close">OK</button></div>`);
+  if(!x.m&&x.n==='LEESMIJ.TXT')return dlg(`<h3>LEESMIJ.TXT</h3><p>Voor je flasht:<br>1. Noteer je huidige BIOS-versie.<br>2. Download alleen de BIOS voor jouw exacte moederbord en revisie.<br>3. Bewaar een profiel van je instellingen.<br>4. Zorg voor stabiele stroom (laptop aan de lader).</p><div class="acts"><button class="pri" data-a="close">OK</button></div>`);
+  if(!x.m)return dlg(`<h3>Error</h3><p class="warn">This is not a proper BIOS file!</p><div class="acts"><button class="pri" data-a="close">OK</button></div>`);
+  if(x.m!=='LAB H310M-A')return dlg(`<h3>Error</h3><p class="warn">This is not a proper BIOS! Dit bestand is voor moederbord ${x.m}.</p><p>Een BIOS voor een ander moederbord kan de pc onbruikbaar maken. EZ Flash weigert het.</p><div class="acts"><button class="pri" data-a="close">OK</button></div>`);
+  if(x.v===st.ver)return dlg(`<h3>Same version</h3><p>Dit is dezelfde versie als die nu geïnstalleerd is (${x.v}). Een update is niet nodig.</p><div class="acts"><button class="pri" data-a="close">OK</button></div>`);
+  if(+x.v<+st.ver)return dlg(`<h3>Older version</h3><p>Deze versie (${x.v}) is ouder dan de geïnstalleerde. Terugzetten naar een oudere BIOS is meestal niet de bedoeling.</p><div class="acts"><button class="pri" data-a="close">OK</button></div>`);
+  return dlg(`<h3>Do you want to update the BIOS?</h3><p>Huidig: ${st.ver} → nieuw: ${x.v}</p>${st.profile?'':'<p class="warn">Let op: je hebt nog geen back-up (profiel) van je instellingen. Na de update zijn ze weg.</p>'}<div class="acts"><button data-a="close">No</button><button class="pri" data-a="fgo">Yes</button></div>`)}
+ if(a==='fgo'){ui.dlg=null;const f=ui.flash;f.stage='run';f.p=0;stop();
+  ui.timer=setInterval(()=>{f.p+=2;f.msg=f.p<30?'Erasing flash ...':f.p<80?'Writing BIOS ...':'Verifying ...';if(f.p>=100){stop();f.stage='done';st.ver='1401';st.cur=clone(DEF);st.saved=clone(DEF);st.adminPw='';st.userPw='';persist();renderAside()}render()},120);return render()}
+ if(a==='fcut'){stop();ui.mode='brick';return render()}
+ if(a==='fdone'){ui.nextMsg='De pc is herstart met BIOS-versie '+st.ver+'. Open de BIOS opnieuw om je profiel terug te zetten.';return post()}
+}
+
+/* ================= Q-Fan ================= */
+const CURVES={Silent:[[20,20],[50,25],[70,45],[85,100]],Standard:[[20,20],[45,30],[65,60],[80,100]],Turbo:[[20,35],[40,55],[60,80],[75,100]],'Full Speed':[[20,100],[100,100]]};
+function openQfan(){ui.ret=ui.adv;ui.dlg=null;ui.mode='qfan';ui.qfan={p:st.cur.fan};render()}
+function qfanHTML(){const p=ui.qfan.p,c=CURVES[p],W=520,H=260,X=t=>40+(t-20)/80*(W-60),Y=d=>H-30-d/100*(H-50);const m=mon();
+ const pts=c.map(([t,d])=>X(t)+','+Y(d)).join(' ');const last=c[c.length-1];
+ return `<div class="fl"><h2>Q-Fan Control – CPU Fan</h2><div class="qf"><div><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Ventilatorcurve ${p}">
+ ${[0,25,50,75,100].map(d=>`<line x1="40" x2="${W-20}" y1="${Y(d)}" y2="${Y(d)}" stroke="#2a3038"/><text x="34" y="${Y(d)+4}" fill="#7d8695" font-size="11" text-anchor="end">${d}%</text>`).join('')}
+ ${[20,40,60,80,100].map(t=>`<text x="${X(t)}" y="${H-12}" fill="#7d8695" font-size="11" text-anchor="middle">${t}°C</text>`).join('')}
+ <polyline points="${pts} ${X(100)},${Y(last[1])}" fill="none" stroke="#4cc7ec" stroke-width="3"/>${c.map(([t,d])=>`<circle cx="${X(t)}" cy="${Y(d)}" r="5" fill="#4cc7ec"/>`).join('')}
+ <line x1="${X(m.ct)}" x2="${X(m.ct)}" y1="20" y2="${H-30}" stroke="#ffd166" stroke-dasharray="4 4"/><text x="${X(m.ct)+6}" y="32" fill="#ffd166" font-size="12">CPU ${m.ct}°C</text></svg>
+ <p style="color:#9aa3b1;font:13px 'IBM Plex Sans',sans-serif">Horizontaal: CPU-temperatuur. Verticaal: snelheid van de ventilator. Silent = stiller maar warmer, Turbo = koeler maar luider.${st.hw.fan?'':' <span style="color:#ff8a80">Er is geen CPU-ventilator gedetecteerd!</span>'}</p></div>
+ <div><div class="ezb">${Object.keys(CURVES).map(k=>`<button data-a="qset" data-v="${k}" class="${k===p?'on':''}">${k}</button>`).join('')}</div><div class="ezb" style="margin-top:14px"><button data-a="qapply">Apply</button><button data-a="qexit">Exit (Esc)</button></div></div></div></div>`}
+function qfanA(a,d){if(a==='qset'){ui.qfan.p=d.v;return render()}if(a==='qapply'){if(userBlock())return;st.cur.fan=ui.qfan.p;persist();ui.mode='bios';ui.adv=ui.ret;return render()}if(a==='qexit'){ui.mode='bios';ui.adv=ui.ret;return render()}}
+
+/* ================= rechterpaneel ================= */
+function renderAside(){
+ const el=$('#aside');
+ if(view==='oefen'){let first=-1;
+  const h=M.map((m,i)=>{const d=isDone(m,i);if(!d&&first<0)first=i;return `<li class="${d?'done':''} ${!d&&first===i?'cur':''}"><span class="q">${m.q}</span><b>${m.t}</b><p>${m.d}</p>${m.ask&&!d?`<form data-i="${i}"><input aria-label="Antwoord" placeholder="Jouw antwoord"><button class="sbtn">Controleer</button></form><div class="fb" id="fb${i}"></div>`:''}</li>`}).join('');
+  const n=M.filter(isDone).length;
+  el.innerHTML=`<h2>Opdrachten</h2><p class="meta">Werk ze in volgorde af. De simulator vinkt ze automatisch af.</p><div class="pbar"><i style="width:${n/M.length*100}%"></i></div><ol class="ms">${h}</ol><button class="sbtn" data-g="wipe" style="margin-top:12px">Alles opnieuw beginnen</button><p class="note">Je voortgang blijft bewaard in deze browser.</p>`;return}
+ const a=G.active;
+ if(!a){const done=SC.filter(s=>G.scores[s.id]!=null).length,tot=SC.reduce((x,s)=>x+(G.scores[s.id]||0),0);
+  el.innerHTML=`<h2>Storingsmodus</h2><p class="meta">Een gebruiker meldt een probleem. Start de pc, zoek de oorzaak in de BIOS of in de pc-kast en los het op. Minder hints en sneller = meer punten.</p>
+  <p><b>${done}/${SC.length}</b> opgelost · <b>${tot}</b> punten</p>
+  <button class="sbtn pri" data-g="random" style="width:100%;margin-bottom:10px">Willekeurige storing</button>
+  <div class="sc">${SC.map(s=>`<button class="scn" data-g="start" data-v="${s.id}"><b>${esc(s.t)}</b><small>${'★'.repeat(s.st)}${'☆'.repeat(3-s.st)}</small><span class="r">${G.scores[s.id]!=null?G.scores[s.id]+' p':''}</span></button>`).join('')}</div>
+  <button class="sbtn" data-g="wipeg" style="margin-top:12px">Scores wissen</button>`;return}
+ const s=SC.find(x=>x.id===a.id);const {secs}=scoreOf(a);
+ el.innerHTML=`<span class="q">Storingsticket · ${'★'.repeat(s.st)}${'☆'.repeat(3-s.st)}</span><h2>${esc(s.t)}</h2>
+ <div class="ticket"><div class="from">Melding van de gebruiker</div><blockquote>${esc(s.k)}</blockquote></div>
+ ${a.result?'':`<div class="timer" id="gtimer">${fmtS(secs)}</div>`}
+ ${a.hints?`<ol class="hints">${s.h.slice(0,a.hints).map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`:''}
+ ${a.result?`<div class="result ${a.result==='ok'?'':'fail'}"><h3>${a.result==='ok'?'Opgelost! '+a.pts+' punten':'Oplossing'}</h3><p>${esc(s.u)}</p>${a.result==='ok'?`<p class="meta">Tijd ${fmtS(a.secs)} · ${a.hints} hint(s) · ${a.fails} foute test(s)</p>`:`<ol class="hints">${s.h.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`}</div><div class="row2"><button class="sbtn pri" data-g="next">Volgende storing</button><button class="sbtn" data-g="list">Overzicht</button></div>`
+ :`<div class="row2"><button class="sbtn pri" data-g="test">Opgelost? Test de pc</button><button class="sbtn" data-g="hint" ${a.hints>=s.h.length?'disabled':''}>Hint (${a.hints}/${s.h.length})</button></div><div class="fb" id="gfb"></div><div class="row2"><button class="sbtn" data-g="giveup">Opgeven</button><button class="sbtn" data-g="list">Overzicht</button></div><p class="note">Tip: start eerst de pc op om het probleem zelf te zien. Wijzigingen tellen pas als ze opgeslagen zijn (F10).</p>`}`;
+}
+const fmtS=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+setInterval(()=>{const t=$('#gtimer');if(t&&G.active&&!G.active.result)t.textContent=fmtS(scoreOf(G.active).secs)},1000);
+function startScenario(id){const s=SC.find(x=>x.id===id);ST.storing=fresh();st=ST.storing;s.set(st);st.cur=clone(st.saved);G.active={id,start:Date.now(),hints:0,fails:0,result:null};persist();stop();ui.mode='off';ui.dlg=null;render();renderAside()}
+$('#aside').addEventListener('submit',e=>{e.preventDefault();const f=e.target,i=+f.dataset.i,v=f.querySelector('input').value;
+ if(M[i].ask(v)){F['ans'+i]=true;persist();renderAside()}else{const fb=$('#fb'+i);fb.textContent='Nog niet juist. Kijk nog eens goed in de BIOS.';fb.className='fb no'}});
+$('#aside').addEventListener('click',e=>{const b=e.target.closest('[data-g]');if(!b)return;const g=b.dataset.g,a=G.active;
+ if(g==='wipe'){ST.oefen=fresh();st=ST.oefen;F={};persist();stop();ui.mode='off';render();renderAside()}
+ else if(g==='wipeg'){G={scores:{},active:null};persist();renderAside()}
+ else if(g==='start')startScenario(b.dataset.v);
+ else if(g==='random'||g==='next'){const open=SC.filter(s=>G.scores[s.id]==null&&(!a||s.id!==a.id));const pool=open.length?open:SC.filter(s=>!a||s.id!==a.id);startScenario(pool[Math.floor(Math.random()*pool.length)].id)}
+ else if(g==='list'){G.active=null;persist();renderAside()}
+ else if(g==='hint'){a.hints++;persist();renderAside()}
+ else if(g==='giveup'){a.result='gave';persist();renderAside()}
+ else if(g==='test'){const s=SC.find(x=>x.id===a.id);
+  if(s.chk()){const r=scoreOf(a);a.result='ok';a.pts=r.pts;a.secs=r.secs;G.scores[a.id]=Math.max(G.scores[a.id]||0,r.pts);persist();renderAside()}
+  else{a.fails++;persist();renderAside();const fb=$('#gfb');fb.textContent='Het probleem is er nog. Start de pc opnieuw op en kijk wat er gebeurt. (Opgeslagen met F10? Hardware aangepast met de pc uit?)';fb.className='fb no'}}
+});
+
+/* ================= routes ================= */
+function route(){const h=location.hash;const v=h==='#vm'?'vm':h==='#storing'?'storing':'sim';
+ $('#v-sim').classList.toggle('on',v!=='vm');$('#v-vm').classList.toggle('on',v==='vm');
+ for(const x of ['sim','storing','vm'])$('#n-'+x).classList.toggle('on',x===v);
+ const nv=v==='storing'?'storing':'oefen';
+ if(v!=='vm'&&nv!==view){view=nv;st=ST[view];stop();ui.mode='off';ui.dlg=null;ui.adv=false;render()}
+ renderAside()}
+addEventListener('hashchange',route);
+route();render();
+}
+</script>
+</body>
+</html>
